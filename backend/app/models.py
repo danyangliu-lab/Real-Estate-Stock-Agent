@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import Column, String, Float, Integer, DateTime, Date, Text, Index, Boolean
 from sqlalchemy.sql import func
 from app.database import Base
@@ -12,7 +14,7 @@ class User(Base):
     display_name = Column(String(100), default="")
     is_admin = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, default=datetime.now)
 
 
 class Commentary(Base):
@@ -27,8 +29,8 @@ class Commentary(Base):
     author = Column(String(50), default="admin")
     is_published = Column(Boolean, default=True)
     publish_date = Column(Date, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class Report(Base):
@@ -45,7 +47,7 @@ class Report(Base):
     author = Column(String(50), default="admin")
     is_published = Column(Boolean, default=True)
     publish_date = Column(Date, nullable=False)
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, default=datetime.now)
 
 
 class Stock(Base):
@@ -58,8 +60,8 @@ class Stock(Base):
     sector = Column(String(50), default="房地产")
     market_cap = Column(Float, nullable=True)
     is_active = Column(Integer, default=1)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 
 class StockPrice(Base):
@@ -100,4 +102,4 @@ class Rating(Base):
     rating = Column(String(20), nullable=False)
     # 评级理由
     reason = Column(Text, default="")
-    created_at = Column(DateTime, server_default=func.now())
+    created_at = Column(DateTime, default=datetime.now)

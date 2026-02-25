@@ -4,7 +4,7 @@ API路由 - 包含评级、认证、点评、报告模块
 
 import os
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import aiofiles
@@ -142,7 +142,12 @@ async def get_dashboard(db: AsyncSession = Depends(get_db)):
             quant_only += 1
         if r.created_at and (latest_time is None or r.created_at > latest_time):
             latest_time = r.created_at
-    refresh_time_str = latest_time.strftime("%Y-%m-%d %H:%M") if latest_time else None
+    # 将时间转为北京时间显示（兼容 SQLite UTC 存储和系统时区已设为 Asia/Shanghai 两种情况）
+    if latest_time:
+        # 如果 latest_time 是 naive datetime，假定为系统本地时间（Docker 已设 TZ=Asia/Shanghai）
+        refresh_time_str = latest_time.strftime("%Y-%m-%d %H:%M")
+    else:
+        refresh_time_str = None
     return DashboardStats(
         total_stocks=total or 0,
         rated_today=rated_count,

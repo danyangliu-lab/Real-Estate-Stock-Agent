@@ -11,6 +11,7 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      - TZ=Asia/Shanghai
       - REFRESH_HOUR=9
       - REFRESH_MINUTE=0
 
