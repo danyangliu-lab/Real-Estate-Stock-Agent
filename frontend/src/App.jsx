@@ -8,6 +8,7 @@ import StatsCards from './components/StatsCards'
 import CommentarySection from './components/CommentarySection'
 import ReportSection from './components/ReportSection'
 import UserManagement from './components/UserManagement'
+import NewsSection from './components/NewsSection'
 
 const BASE_TABS = [
   { key: 'rating', label: 'AI评级' },
@@ -177,6 +178,7 @@ export default function App() {
         {activeTab === 'rating' && (
           <>
             <StatsCards dashboard={dashboard} />
+            <NewsSection />
             <RatingMethodology />
 
             <div className="filters">

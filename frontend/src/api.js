@@ -73,6 +73,15 @@ export const api = {
   getPrices: (code, days = 60) => request(`/prices/${code}?days=${days}`),
   getRatingTrend: (code, days = 30) => request(`/rating-trend/${code}?days=${days}`),
 
+  // ========== 新闻资讯 ==========
+  getNews: (code, name) => {
+    const qs = new URLSearchParams()
+    if (code) qs.set('code', code)
+    if (name) qs.set('name', name)
+    const q = qs.toString()
+    return request(`/news${q ? `?${q}` : ''}`)
+  },
+
   // ========== 市场点评 ==========
   getCommentaries: (category, limit = 20) => {
     const qs = new URLSearchParams()

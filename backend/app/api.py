@@ -20,6 +20,7 @@ from app.auth import (
 from app.config import UPLOAD_DIR
 from app.database import get_db
 from app.models import Stock, Rating, StockPrice, User, Commentary, Report
+from app.news_fetcher import fetch_sina_industry_news, fetch_eastmoney_news, fetch_stock_news
 from app.schemas import (
     StockOut, RatingOut, PriceOut, DashboardStats, RatingHistoryOut,
     LoginRequest, RegisterRequest, TokenResponse, UserOut,
@@ -158,6 +159,34 @@ async def get_dashboard(db: AsyncSession = Depends(get_db)):
         quant_only_count=quant_only,
         refresh_time=refresh_time_str,
     )
+
+
+@router.get("/news")
+async def get_news(code: Optional[str] = Query(None), name: Optional[str] = Query(None)):
+    """获取房地产行业新闻资讯"""
+    import asyncio
+
+    news_list = []
+    existing_titles = set()
+
+    # 行业新闻（并发获取）
+    sina_news = await asyncio.to_thread(fetch_sina_industry_news, 10)
+    eastmoney_news = await asyncio.to_thread(fetch_eastmoney_news, 10)
+
+    for n in sina_news + eastmoney_news:
+        if n["title"] not in existing_titles:
+            news_list.append(n)
+            existing_titles.add(n["title"])
+
+    # 个股新闻
+    stock_news = []
+    if code and name:
+        stock_news = await asyncio.to_thread(fetch_stock_news, code, name, 5)
+
+    return {
+        "industry_news": news_list[:15],
+        "stock_news": stock_news[:5],
+    }
 
 
 @router.get("/stocks", response_model=list[StockOut])

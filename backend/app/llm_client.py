@@ -71,8 +71,20 @@ def _build_tc3_auth(timestamp: int, payload: str) -> str:
     return authorization
 
 
-async def chat_hunyuan(prompt: str, system: str = "", temperature: float = 0.3) -> Optional[str]:
-    """调用腾讯混元大模型"""
+async def chat_hunyuan(
+    prompt: str,
+    system: str = "",
+    temperature: float = 0.3,
+    enable_search: bool = False,
+) -> Optional[str]:
+    """调用腾讯混元大模型
+    
+    Args:
+        prompt: 用户提示
+        system: 系统提示
+        temperature: 温度参数
+        enable_search: 是否开启联网搜索（获取最新资讯）
+    """
     if not HUNYUAN_SECRET_ID or not HUNYUAN_SECRET_KEY:
         logger.warning("未配置腾讯混元 API 密钥，跳过 AI 评级")
         return None
@@ -88,7 +100,7 @@ async def chat_hunyuan(prompt: str, system: str = "", temperature: float = 0.3) 
         "Temperature": temperature,
         "TopP": 0.8,
         "Stream": False,
-        "EnableEnhancement": False,
+        "EnableEnhancement": enable_search,
     })
 
     timestamp = int(time.time())
