@@ -1723,3 +1723,105 @@ a.news-title:hover {
   white-space: nowrap;
   flex-shrink: 0;
 }
+
+/* ========== 分享按钮 ========== */
+.btn-share {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  border: none;
+  font-weight: 500;
+}
+.btn-share:hover {
+  opacity: 0.9;
+}
+
+/* ========== 分享弹窗 ========== */
+.share-modal {
+  max-width: 440px;
+  width: 90vw;
+}
+.share-modal-body {
+  padding: 20px;
+}
+.share-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+.share-modal-url-box {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 20px;
+}
+.share-modal-url {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg);
+  outline: none;
+  min-width: 0;
+}
+.share-modal-url:focus {
+  border-color: var(--primary);
+}
+.share-copy-btn {
+  white-space: nowrap;
+  min-width: 80px;
+  transition: all 0.2s;
+}
+.share-copy-btn.copied {
+  background: #10b981;
+}
+.share-modal-tips {
+  background: #f8f9ff;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.share-tip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.share-tip-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.share-tip-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.share-preview-link {
+  display: block;
+  text-align: center;
+  font-size: 13px;
+  color: #667eea;
+  text-decoration: none;
+}
+.share-preview-link:hover {
+  text-decoration: underline;
+}

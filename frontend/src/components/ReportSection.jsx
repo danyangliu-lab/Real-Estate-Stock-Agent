@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
+import ShareModal from './ShareModal'
 
 function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B'
@@ -20,6 +21,7 @@ export default function ReportSection({ user }) {
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
+  const [shareReport, setShareReport] = useState(null)
 
   const isAdmin = user?.is_admin
 
@@ -97,6 +99,9 @@ export default function ReportSection({ user }) {
                 </div>
               </div>
               <div className="report-card-actions">
+                <button className="btn btn-sm btn-share" onClick={() => setShareReport(r)}>
+                  分享
+                </button>
                 <button className="btn btn-primary btn-sm" onClick={() => handleDownload(r.id)}>
                   下载
                 </button>
@@ -115,6 +120,14 @@ export default function ReportSection({ user }) {
         <ReportUploader
           onClose={() => setShowUpload(false)}
           onUploaded={() => { setShowUpload(false); loadData() }}
+        />
+      )}
+
+      {shareReport && (
+        <ShareModal
+          title={shareReport.title}
+          url={`${window.location.origin}/api/share/report/${shareReport.id}`}
+          onClose={() => setShareReport(null)}
         />
       )}
     </div>

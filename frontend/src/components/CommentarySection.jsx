@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { api } from '../api'
+import ShareModal from './ShareModal'
 
 const CATEGORIES = [
   { value: '', label: '全部点评' },
@@ -14,6 +15,7 @@ export default function CommentarySection({ user }) {
   const [selectedItem, setSelectedItem] = useState(null)
   const [showEditor, setShowEditor] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
+  const [shareItem, setShareItem] = useState(null)
 
   const isAdmin = user?.is_admin
 
@@ -117,12 +119,15 @@ export default function CommentarySection({ user }) {
               </p>
               <div className="commentary-card-footer">
                 <span className="commentary-author">{item.author}</span>
-                {isAdmin && (
-                  <div className="commentary-actions" onClick={e => e.stopPropagation()}>
-                    <button className="btn btn-sm" onClick={() => handleEdit(item)}>编辑</button>
-                    <button className="btn btn-sm btn-danger" onClick={() => handleDelete(item.id)}>删除</button>
-                  </div>
-                )}
+                <div className="commentary-actions" onClick={e => e.stopPropagation()}>
+                  <button className="btn btn-sm btn-share" onClick={() => setShareItem(item)}>分享</button>
+                  {isAdmin && (
+                    <>
+                      <button className="btn btn-sm" onClick={() => handleEdit(item)}>编辑</button>
+                      <button className="btn btn-sm btn-danger" onClick={() => handleDelete(item.id)}>删除</button>
+                    </>
+                  )}
+                </div>
               </div>
 
               {selectedItem?.id === item.id && (
@@ -146,6 +151,14 @@ export default function CommentarySection({ user }) {
           item={editingItem}
           onClose={() => { setShowEditor(false); setEditingItem(null) }}
           onSaved={handleSaved}
+        />
+      )}
+
+      {shareItem && (
+        <ShareModal
+          title={shareItem.title}
+          url={`${window.location.origin}/api/share/commentary/${shareItem.id}`}
+          onClose={() => setShareItem(null)}
         />
       )}
     </div>

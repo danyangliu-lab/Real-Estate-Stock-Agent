@@ -8,8 +8,8 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import aiofiles
-from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File, Form
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File, Form, Request
+from fastapi.responses import FileResponse, HTMLResponse
 from sqlalchemy import select, func, desc, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -494,3 +494,144 @@ async def delete_report(
         await db.execute(delete(Report).where(Report.id == rid))
         await db.commit()
     return {"ok": True}
+
+
+# ========== 公开分享页面（无需登录） ==========
+
+def _share_html(title: str, description: str, content_html: str, meta_extra: str = "", request: Request = None) -> str:
+    """生成分享页面 HTML（含 Open Graph meta 标签供微信抓取）"""
+    base_url = ""
+    if request:
+        base_url = f"{request.url.scheme}://{request.headers.get('host', '')}"
+    safe_title = title.replace('"', '&quot;').replace('<', '&lt;')
+    safe_desc = description[:150].replace('"', '&quot;').replace('<', '&lt;').replace('\n', ' ')
+    return f"""<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>{safe_title} - 房地产股票AI评级</title>
+<meta property="og:title" content="{safe_title}" />
+<meta property="og:description" content="{safe_desc}" />
+<meta property="og:type" content="article" />
+<meta property="og:site_name" content="房地产股票AI评级" />
+<meta name="description" content="{safe_desc}" />
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:title" content="{safe_title}" />
+<meta name="twitter:description" content="{safe_desc}" />
+{meta_extra}
+<style>
+*{{margin:0;padding:0;box-sizing:border-box}}
+body{{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;background:#f5f5f5;color:#1a1a1a;line-height:1.6}}
+.share-page{{max-width:680px;margin:0 auto;padding:16px}}
+.share-header{{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:24px 20px;border-radius:12px 12px 0 0}}
+.share-header h1{{font-size:20px;font-weight:600;margin-bottom:8px}}
+.share-meta{{font-size:13px;opacity:0.85;display:flex;flex-wrap:wrap;gap:12px}}
+.share-meta span{{display:inline-flex;align-items:center;gap:4px}}
+.share-body{{background:#fff;padding:24px 20px;border-radius:0 0 12px 12px;box-shadow:0 2px 12px rgba(0,0,0,0.08)}}
+.share-body p,.share-body div{{font-size:15px;line-height:1.8;color:#333;white-space:pre-wrap;word-break:break-word}}
+.share-tag{{display:inline-block;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:500;margin-right:8px}}
+.tag-industry{{background:rgba(255,255,255,0.2);color:#fff}}
+.tag-stock{{background:rgba(255,255,255,0.2);color:#fff}}
+.tag-report{{background:rgba(255,255,255,0.2);color:#fff}}
+.share-stocks{{margin-top:16px;padding-top:12px;border-top:1px solid #eee;font-size:13px;color:#666}}
+.share-footer{{text-align:center;padding:20px;color:#999;font-size:12px}}
+.share-footer a{{color:#667eea;text-decoration:none}}
+.share-cta{{display:block;width:100%;max-width:320px;margin:20px auto 0;padding:12px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;text-align:center;text-decoration:none}}
+.share-cta:active{{opacity:0.85}}
+.dl-btn{{display:inline-block;padding:10px 32px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;text-decoration:none;margin-top:12px}}
+.dl-btn:active{{opacity:0.85}}
+</style>
+</head>
+<body>
+<div class="share-page">
+{content_html}
+<div class="share-footer">
+<p>来自 <strong>房地产股票AI评级</strong></p>
+<p style="margin-top:4px">AI评级仅供参考，不构成投资建议</p>
+{f'<a href="{base_url}" class="share-cta">打开完整系统 →</a>' if base_url else ''}
+</div>
+</div>
+</body>
+</html>"""
+
+
+@router.get("/share/commentary/{cid}", response_class=HTMLResponse)
+async def share_commentary(cid: int, request: Request, db: AsyncSession = Depends(get_db)):
+    """市场点评公开分享页面（无需登录）"""
+    result = await db.execute(select(Commentary).where(Commentary.id == cid, Commentary.is_published == True))
+    item = result.scalar_one_or_none()
+    if not item:
+        return HTMLResponse("<h1>内容不存在或已下架</h1>", status_code=404)
+
+    tag_cls = "tag-industry" if item.category == "industry" else "tag-stock"
+    tag_label = "行业点评" if item.category == "industry" else "个股点评"
+
+    stocks_html = ""
+    if item.stock_codes:
+        stocks_html = f'<div class="share-stocks">关联股票：{item.stock_codes}</div>'
+
+    content_html = f"""
+<div class="share-header">
+<h1>{item.title}</h1>
+<div class="share-meta">
+<span class="share-tag {tag_cls}">{tag_label}</span>
+<span>{item.author}</span>
+<span>{item.publish_date}</span>
+</div>
+</div>
+<div class="share-body">
+<div>{item.content}</div>
+{stocks_html}
+</div>"""
+
+    return _share_html(
+        title=item.title,
+        description=item.content[:150],
+        content_html=content_html,
+        request=request,
+    )
+
+
+@router.get("/share/report/{rid}", response_class=HTMLResponse)
+async def share_report(rid: int, request: Request, db: AsyncSession = Depends(get_db)):
+    """研究报告公开分享页面（无需登录）"""
+    result = await db.execute(select(Report).where(Report.id == rid, Report.is_published == True))
+    report = result.scalar_one_or_none()
+    if not report:
+        return HTMLResponse("<h1>内容不存在或已下架</h1>", status_code=404)
+
+    file_size_str = f"{report.file_size / (1024*1024):.1f} MB" if report.file_size > 1024*1024 else f"{report.file_size / 1024:.1f} KB"
+    download_url = f"/api/reports/{rid}/download"
+
+    summary_html = ""
+    if report.summary:
+        summary_html = f"<p>{report.summary}</p>"
+
+    content_html = f"""
+<div class="share-header">
+<h1>{report.title}</h1>
+<div class="share-meta">
+<span class="share-tag tag-report">研究报告</span>
+{f'<span>{report.institution}</span>' if report.institution else ''}
+<span>{report.author}</span>
+<span>{report.publish_date}</span>
+</div>
+</div>
+<div class="share-body">
+{summary_html}
+<div style="margin-top:16px;padding:16px;background:#f8f9fa;border-radius:8px;text-align:center">
+<div style="font-size:36px;margin-bottom:8px">📄</div>
+<div style="font-size:14px;color:#666;margin-bottom:4px">{report.original_name}</div>
+<div style="font-size:12px;color:#999">{file_size_str}</div>
+<a href="{download_url}" class="dl-btn">下载报告</a>
+</div>
+</div>"""
+
+    desc = report.summary or f"{report.institution}研究报告：{report.title}"
+    return _share_html(
+        title=report.title,
+        description=desc,
+        content_html=content_html,
+        request=request,
+    )
