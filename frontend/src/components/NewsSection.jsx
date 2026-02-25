@@ -23,7 +23,7 @@ export default function NewsSection() {
     }
   }
 
-  const allNews = news.industry_news || []
+  const allNews = (news.industry_news || []).slice(0, 5)
 
   if (loading) {
     return (

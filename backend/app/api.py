@@ -20,7 +20,7 @@ from app.auth import (
 from app.config import UPLOAD_DIR
 from app.database import get_db
 from app.models import Stock, Rating, StockPrice, User, Commentary, Report
-from app.news_fetcher import fetch_sina_industry_news, fetch_eastmoney_news, fetch_stock_news
+from app.news_fetcher import fetch_filtered_news, fetch_stock_news
 from app.schemas import (
     StockOut, RatingOut, PriceOut, DashboardStats, RatingHistoryOut,
     LoginRequest, RegisterRequest, TokenResponse, UserOut,
@@ -163,20 +163,11 @@ async def get_dashboard(db: AsyncSession = Depends(get_db)):
 
 @router.get("/news")
 async def get_news(code: Optional[str] = Query(None), name: Optional[str] = Query(None)):
-    """获取房地产行业新闻资讯"""
+    """获取房地产行业新闻资讯（AI筛选，返回最重要的5条）"""
     import asyncio
 
-    news_list = []
-    existing_titles = set()
-
-    # 行业新闻（并发获取）
-    sina_news = await asyncio.to_thread(fetch_sina_industry_news, 10)
-    eastmoney_news = await asyncio.to_thread(fetch_eastmoney_news, 10)
-
-    for n in sina_news + eastmoney_news:
-        if n["title"] not in existing_titles:
-            news_list.append(n)
-            existing_titles.add(n["title"])
+    # 行业新闻：经过 AI 筛选的 top 5
+    industry_news = await fetch_filtered_news(5)
 
     # 个股新闻
     stock_news = []
@@ -184,7 +175,7 @@ async def get_news(code: Optional[str] = Query(None), name: Optional[str] = Quer
         stock_news = await asyncio.to_thread(fetch_stock_news, code, name, 5)
 
     return {
-        "industry_news": news_list[:15],
+        "industry_news": industry_news,
         "stock_news": stock_news[:5],
     }
 

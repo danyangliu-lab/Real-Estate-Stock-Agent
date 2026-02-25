@@ -1,7 +1,10 @@
 """
 房地产行业新闻资讯获取模块
-数据源：新浪财经、东方财富
-用于为AI评级提供最新政策和行业动态
+数据源优先级：官方权威媒体 > 财经媒体
+1. 人民网房产频道、新华网、央视网
+2. 住建部/自然资源部等政府网站资讯
+3. 东方财富房地产板块（兜底）
+获取后通过 AI 进行相关性筛选，只保留高度相关的房地产政策新闻
 """
 
 import json
@@ -9,10 +12,12 @@ import logging
 import random
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Optional
 
 import requests
+
+from app.llm_client import chat_hunyuan
 
 logger = logging.getLogger(__name__)
 
@@ -22,12 +27,29 @@ _USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
 ]
 
-# 新闻缓存（避免每只股票评级时都重复请求）
+# 新闻缓存
 _news_cache: Dict[str, dict] = {}
-_CACHE_TTL = 3600  # 缓存1小时
+_CACHE_TTL = 3600  # 1小时
+
+# 房地产核心关键词（用于初步过滤）
+_RE_KEYWORDS = re.compile(
+    r"房地产|楼市|房企|地产|住房|限购|限贷|公积金|土地出让|保交楼|"
+    r"房贷|首付|棚改|旧改|城中村|住建部|不动产|房价|二手房|新房|"
+    r"商品房|住宅|物业|土地市场|房住不炒|LPR|按揭|购房|预售|"
+    r"土拍|宅基地|住房公积金|房产税|存量房|经适房|保障房|"
+    r"碧桂园|万科|恒大|融创|华润置地|中海|龙湖|保利|招商蛇口|金地"
+)
 
 
 def _get_headers():
+    return {
+        "User-Agent": random.choice(_USER_AGENTS),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+    }
+
+
+def _get_json_headers():
     return {
         "User-Agent": random.choice(_USER_AGENTS),
         "Accept": "application/json, text/plain, */*",
@@ -36,7 +58,6 @@ def _get_headers():
 
 
 def _get_cached(key: str) -> Optional[List[Dict]]:
-    """获取缓存的新闻"""
     if key in _news_cache:
         entry = _news_cache[key]
         if time.time() - entry["ts"] < _CACHE_TTL:
@@ -45,170 +66,302 @@ def _get_cached(key: str) -> Optional[List[Dict]]:
 
 
 def _set_cache(key: str, data: List[Dict]):
-    """设置缓存"""
     _news_cache[key] = {"ts": time.time(), "data": data}
 
 
-def fetch_sina_industry_news(count: int = 15) -> List[Dict]:
-    """
-    从新浪财经获取房地产行业新闻
-    使用新浪财经搜索API
-    """
-    cache_key = "sina_industry"
-    cached = _get_cached(cache_key)
-    if cached is not None:
-        return cached
+# ========== 官方权威媒体数据源 ==========
 
-    news_list = []
-    keywords = ["房地产政策", "楼市调控", "房地产"]
+def _fetch_people_cn() -> List[Dict]:
+    """人民网房产频道"""
+    news = []
+    try:
+        # 人民网房产频道 RSS/列表页
+        url = "http://house.people.com.cn/GB/164291/index.html"
+        resp = requests.get(url, headers=_get_headers(), timeout=10)
+        resp.encoding = "gb2312"
+        if resp.status_code == 200:
+            # 提取标题和链接
+            pattern = r'<a[^>]*href="(http://house\.people\.com\.cn/[^"]*)"[^>]*>([^<]+)</a>'
+            matches = re.findall(pattern, resp.text)
+            for link, title in matches[:20]:
+                title = title.strip()
+                if len(title) > 8 and _RE_KEYWORDS.search(title):
+                    news.append({
+                        "title": title,
+                        "source": "人民网",
+                        "url": link,
+                        "time": "",
+                    })
+    except Exception as e:
+        logger.debug(f"人民网房产频道获取失败: {e}")
+    return news
 
-    for keyword in keywords:
-        try:
-            url = (
-                f"https://search.sina.com.cn/news?"
-                f"q={keyword}&c=news&sort=time&range=all&num=10&page=1"
-            )
-            # 新浪搜索页面解析较复杂，改用新浪财经滚动新闻API
-            break
-        except Exception:
-            continue
 
-    # 使用新浪财经滚动新闻接口（房产频道）
+def _fetch_xinhua_net() -> List[Dict]:
+    """新华网房产频道"""
+    news = []
+    try:
+        url = "http://www.news.cn/house/latest_news.html"
+        resp = requests.get(url, headers=_get_headers(), timeout=10)
+        resp.encoding = "utf-8"
+        if resp.status_code == 200:
+            pattern = r'<a[^>]*href="(https?://www\.news\.cn/[^"]*)"[^>]*>([^<]+)</a>'
+            matches = re.findall(pattern, resp.text)
+            for link, title in matches[:20]:
+                title = title.strip()
+                if len(title) > 8 and _RE_KEYWORDS.search(title):
+                    news.append({
+                        "title": title,
+                        "source": "新华网",
+                        "url": link,
+                        "time": "",
+                    })
+    except Exception as e:
+        logger.debug(f"新华网房产频道获取失败: {e}")
+    return news
+
+
+def _fetch_gov_cn() -> List[Dict]:
+    """中国政府网 - 房地产相关政策"""
+    news = []
+    try:
+        # 中国政府网搜索接口
+        url = (
+            "http://sousuo.www.gov.cn/search-gov/data?"
+            "t=zhengcelibrary_gw&q=房地产&timetype=timeqb&mintime=&maxtime="
+            "&sort=pubtime&sortType=1&searchfield=title&pcodeJig498=&childtype="
+            "&subchildtype=&tsbq=&pubtimeyear=&puborg=&pcodeYear=&pcodeNum=&p=0&n=5&inpro="
+        )
+        resp = requests.get(url, headers=_get_json_headers(), timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            items = data.get("searchVO", {}).get("catMap", {}).get("zhengcelibrary_gw", {}).get("listVO", [])
+            for item in items[:10]:
+                title = item.get("title", "").strip()
+                title = re.sub(r'<[^>]+>', '', title)
+                if title and len(title) > 6:
+                    news.append({
+                        "title": title,
+                        "source": "中国政府网",
+                        "url": item.get("url", ""),
+                        "time": item.get("pubtimeStr", ""),
+                    })
+    except Exception as e:
+        logger.debug(f"中国政府网获取失败: {e}")
+    return news
+
+
+def _fetch_sina_finance() -> List[Dict]:
+    """新浪财经房产频道"""
+    news = []
     try:
         url = (
             "https://feed.mix.sina.com.cn/api/roll/get?"
             "pageid=155&lid=1686&k=&num=20&page=1&r=0.1"
         )
-        resp = requests.get(url, headers=_get_headers(), timeout=10)
+        resp = requests.get(url, headers=_get_json_headers(), timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             items = data.get("result", {}).get("data", [])
-            for item in items[:count]:
+            for item in items[:15]:
                 title = item.get("title", "").strip()
-                if not title:
-                    continue
-                # 过滤非房地产相关
-                news_list.append({
-                    "title": title,
-                    "source": "新浪财经",
-                    "time": item.get("ctime", ""),
-                    "url": item.get("url", ""),
-                })
+                if title and _RE_KEYWORDS.search(title):
+                    news.append({
+                        "title": title,
+                        "source": "新浪财经",
+                        "url": item.get("url", ""),
+                        "time": item.get("ctime", ""),
+                    })
     except Exception as e:
-        logger.warning(f"获取新浪房产新闻失败: {e}")
-
-    # 备选：新浪财经要闻（可能包含房地产政策）
-    if len(news_list) < 5:
-        try:
-            url = (
-                "https://feed.mix.sina.com.cn/api/roll/get?"
-                "pageid=153&lid=2509&k=&num=30&page=1&r=0.1"
-            )
-            resp = requests.get(url, headers=_get_headers(), timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                items = data.get("result", {}).get("data", [])
-                re_keywords = re.compile(
-                    r"房地产|楼市|房企|地产|住房|限购|限贷|公积金|"
-                    r"土地|保交楼|房贷|首付|棚改|旧改|城中村|"
-                    r"住建|不动产|物业|房价|二手房|新房"
-                )
-                for item in items:
-                    title = item.get("title", "").strip()
-                    if title and re_keywords.search(title):
-                        news_list.append({
-                            "title": title,
-                            "source": "新浪财经",
-                            "time": item.get("ctime", ""),
-                            "url": item.get("url", ""),
-                        })
-        except Exception as e:
-            logger.warning(f"获取新浪财经要闻失败: {e}")
-
-    _set_cache(cache_key, news_list)
-    return news_list
+        logger.debug(f"新浪财经房产频道获取失败: {e}")
+    return news
 
 
-def fetch_eastmoney_news(count: int = 15) -> List[Dict]:
-    """
-    从东方财富获取房地产板块新闻
-    使用东方财富资讯接口
-    """
-    cache_key = "eastmoney_industry"
-    cached = _get_cached(cache_key)
-    if cached is not None:
-        return cached
-
-    news_list = []
+def _fetch_eastmoney() -> List[Dict]:
+    """东方财富房地产板块"""
+    news = []
     try:
-        # 东方财富房地产板块资讯
         url = (
             "https://np-listapi.eastmoney.com/comm/web/getNewsByColumns?"
             "client=web&biz=web_news_col&column=351&order=1"
-            f"&needInteractData=0&page_index=1&page_size={count}"
+            "&needInteractData=0&page_index=1&page_size=15"
         )
-        resp = requests.get(url, headers=_get_headers(), timeout=10)
+        resp = requests.get(url, headers=_get_json_headers(), timeout=10)
         if resp.status_code == 200:
             data = resp.json()
             items = data.get("data", {}).get("list", [])
             for item in items:
                 title = item.get("title", "").strip()
-                if not title:
-                    continue
-                news_list.append({
-                    "title": title,
-                    "source": "东方财富",
-                    "time": item.get("showTime", ""),
-                    "url": item.get("url", ""),
-                })
+                if title and _RE_KEYWORDS.search(title):
+                    news.append({
+                        "title": title,
+                        "source": "东方财富",
+                        "url": item.get("url", ""),
+                        "time": item.get("showTime", ""),
+                    })
     except Exception as e:
-        logger.warning(f"获取东方财富新闻失败: {e}")
+        logger.debug(f"东方财富房地产板块获取失败: {e}")
+    return news
 
-    # 备选：东方财富财经要闻
-    if len(news_list) < 5:
+
+# ========== AI 相关性筛选 ==========
+
+async def _ai_filter_news(news_list: List[Dict], top_n: int = 5) -> List[Dict]:
+    """
+    用混元大模型对新闻进行相关性筛选
+    筛选标准：只保留与房地产行业政策、调控、市场趋势高度相关的重要新闻
+    """
+    if len(news_list) <= top_n:
+        return news_list
+
+    # 构建新闻列表文本
+    news_text = "\n".join(
+        f"{i+1}. [{n['source']}] {n['title']}"
+        for i, n in enumerate(news_list[:25])  # 最多送25条给AI筛选
+    )
+
+    prompt = f"""以下是今天获取到的房地产相关新闻列表，请从中筛选出最重要的{top_n}条，筛选标准：
+
+1. 必须与中国房地产行业直接高度相关（政策调控、市场走势、房企动态、土地市场等）
+2. 优先选择：中央/地方政府出台的房地产政策、重大市场数据（房价、销售额等）、头部房企重大事件
+3. 排除：与房地产无关的一般财经新闻、广告软文、重复内容
+
+新闻列表：
+{news_text}
+
+请直接返回筛选后的新闻编号（如"1,3,5,8,12"），只返回数字编号用逗号分隔，不要其他内容。"""
+
+    try:
+        result = await chat_hunyuan(prompt, temperature=0.1)
+        if result:
+            # 解析返回的编号
+            result = result.strip()
+            numbers = re.findall(r'\d+', result)
+            selected_indices = []
+            for num_str in numbers:
+                idx = int(num_str) - 1  # 转为0-based
+                if 0 <= idx < len(news_list):
+                    selected_indices.append(idx)
+            if selected_indices:
+                filtered = [news_list[i] for i in selected_indices[:top_n]]
+                logger.info(f"AI筛选: {len(news_list)}条 → {len(filtered)}条")
+                return filtered
+    except Exception as e:
+        logger.warning(f"AI新闻筛选失败，使用关键词排序兜底: {e}")
+
+    # AI不可用时的兜底：按来源权重+关键词密度排序
+    return _keyword_rank_news(news_list, top_n)
+
+
+def _keyword_rank_news(news_list: List[Dict], top_n: int = 5) -> List[Dict]:
+    """基于来源权重和关键词密度的排序（AI不可用时的兜底）"""
+    source_weight = {
+        "中国政府网": 10,
+        "人民网": 8,
+        "新华网": 8,
+        "新浪财经": 5,
+        "东方财富": 4,
+    }
+
+    # 高权重关键词（政策类优先）
+    policy_keywords = re.compile(
+        r"限购|限贷|降息|LPR|首付|公积金|住建部|调控|政策|"
+        r"保交楼|棚改|旧改|城中村|房产税|土地出让|土拍"
+    )
+
+    scored = []
+    for n in news_list:
+        score = source_weight.get(n["source"], 3)
+        title = n["title"]
+        # 政策关键词加分
+        policy_matches = len(policy_keywords.findall(title))
+        score += policy_matches * 3
+        # 核心关键词匹配数
+        core_matches = len(_RE_KEYWORDS.findall(title))
+        score += core_matches
+        scored.append((score, n))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [item[1] for item in scored[:top_n]]
+
+
+# ========== 获取所有新闻（聚合+去重+关键词过滤） ==========
+
+def fetch_all_industry_news() -> List[Dict]:
+    """
+    从多个官方/权威数据源获取房地产行业新闻
+    返回初步过滤后的新闻列表（尚未经过AI筛选）
+    """
+    cache_key = "all_industry_raw"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    all_news = []
+    existing_titles = set()
+
+    # 按优先级依次获取（官方媒体优先）
+    sources = [
+        ("中国政府网", _fetch_gov_cn),
+        ("人民网", _fetch_people_cn),
+        ("新华网", _fetch_xinhua_net),
+        ("新浪财经", _fetch_sina_finance),
+        ("东方财富", _fetch_eastmoney),
+    ]
+
+    for name, fetcher in sources:
         try:
-            url = (
-                "https://np-listapi.eastmoney.com/comm/web/getNewsByColumns?"
-                "client=web&biz=web_news_col&column=350&order=1"
-                f"&needInteractData=0&page_index=1&page_size=30"
-            )
-            resp = requests.get(url, headers=_get_headers(), timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
-                items = data.get("data", {}).get("list", [])
-                re_keywords = re.compile(
-                    r"房地产|楼市|房企|地产|住房|限购|限贷|公积金|"
-                    r"土地|保交楼|房贷|首付|棚改|旧改|城中村|"
-                    r"住建|不动产|物业|房价|二手房|新房"
-                )
-                for item in items:
-                    title = item.get("title", "").strip()
-                    if title and re_keywords.search(title):
-                        news_list.append({
-                            "title": title,
-                            "source": "东方财富",
-                            "time": item.get("showTime", ""),
-                            "url": item.get("url", ""),
-                        })
+            news = fetcher()
+            for n in news:
+                # 去重（标题相似度判断）
+                title = n["title"]
+                if title in existing_titles:
+                    continue
+                # 简单相似度：标题前15字相同视为重复
+                short_title = title[:15]
+                if any(short_title == t[:15] for t in existing_titles):
+                    continue
+                existing_titles.add(title)
+                all_news.append(n)
+            if news:
+                logger.info(f"  {name}: 获取 {len(news)} 条")
         except Exception as e:
-            logger.warning(f"获取东方财富要闻失败: {e}")
+            logger.debug(f"  {name}: 获取失败 {e}")
 
-    _set_cache(cache_key, news_list)
-    return news_list
+    _set_cache(cache_key, all_news)
+    return all_news
 
+
+async def fetch_filtered_news(top_n: int = 5) -> List[Dict]:
+    """
+    获取经过 AI 筛选的高质量房地产新闻
+    返回 top_n 条最重要的新闻
+    """
+    cache_key = f"filtered_top{top_n}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return cached
+
+    raw_news = fetch_all_industry_news()
+    if not raw_news:
+        return []
+
+    # AI 筛选
+    filtered = await _ai_filter_news(raw_news, top_n)
+    _set_cache(cache_key, filtered)
+    return filtered
+
+
+# ========== 个股新闻 ==========
 
 def fetch_stock_news(code: str, name: str, count: int = 5) -> List[Dict]:
-    """
-    获取个股相关新闻
-    """
+    """获取个股相关新闻"""
     cache_key = f"stock_{code}"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
 
     news_list = []
-
-    # 东方财富个股新闻
     try:
         url = (
             f"https://search-api-web.eastmoney.com/search/jsonp?"
@@ -220,10 +373,9 @@ def fetch_stock_news(code: str, name: str, count: int = 5) -> List[Dict]:
             f"%2C%22sort%22%3A%22default%22%2C%22pageIndex%22%3A1%2C%22pageSize%22%3A{count}"
             f"%2C%22preTag%22%3A%22%22%2C%22postTag%22%3A%22%22%7D%7D%7D"
         )
-        resp = requests.get(url, headers=_get_headers(), timeout=10)
+        resp = requests.get(url, headers=_get_json_headers(), timeout=10)
         if resp.status_code == 200:
             text = resp.text
-            # 解析 JSONP: jQuery({...})
             match = re.search(r'jQuery\((\{.*\})\)', text, re.DOTALL)
             if match:
                 data = json.loads(match.group(1))
@@ -234,7 +386,6 @@ def fetch_stock_news(code: str, name: str, count: int = 5) -> List[Dict]:
                 )
                 for item in items[:count]:
                     title = item.get("title", "").strip()
-                    # 去除HTML标签
                     title = re.sub(r'<[^>]+>', '', title)
                     if title:
                         news_list.append({
@@ -250,39 +401,27 @@ def fetch_stock_news(code: str, name: str, count: int = 5) -> List[Dict]:
     return news_list
 
 
+# ========== 供评级引擎调用 ==========
+
 def get_real_estate_news_summary(code: str = "", name: str = "") -> str:
     """
     获取房地产行业新闻摘要，用于注入AI评级prompt
-    返回格式化的新闻文本
+    这里使用原始新闻（不经过AI筛选，因为评级本身会做分析）
     """
-    all_news = []
+    all_news = fetch_all_industry_news()
 
-    # 1. 行业新闻（多数据源）
-    industry_news = fetch_sina_industry_news(10)
-    all_news.extend(industry_news)
-
-    eastmoney_news = fetch_eastmoney_news(10)
-    # 去重
-    existing_titles = {n["title"] for n in all_news}
-    for n in eastmoney_news:
-        if n["title"] not in existing_titles:
-            all_news.append(n)
-            existing_titles.add(n["title"])
-
-    # 2. 个股新闻
     stock_news = []
     if code and name:
         stock_news = fetch_stock_news(code, name, 5)
 
-    # 格式化输出
     lines = []
     today = datetime.now().strftime("%Y-%m-%d")
 
     if all_news:
         lines.append(f"【房地产行业最新资讯（{today}）】")
-        for i, n in enumerate(all_news[:12], 1):
+        for i, n in enumerate(all_news[:10], 1):
             time_str = f" ({n['time']})" if n.get("time") else ""
-            lines.append(f"{i}. {n['title']}{time_str}")
+            lines.append(f"{i}. [{n['source']}] {n['title']}{time_str}")
 
     if stock_news:
         lines.append(f"\n【{name}({code})相关资讯】")
