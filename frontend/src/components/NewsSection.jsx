@@ -4,7 +4,6 @@ import { api } from '../api'
 export default function NewsSection() {
   const [news, setNews] = useState({ industry_news: [], stock_news: [], announcements: [] })
   const [loading, setLoading] = useState(true)
-  const [collapsed, setCollapsed] = useState(true)
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
@@ -70,42 +69,37 @@ export default function NewsSection() {
 
   return (
     <div className="news-section">
-      <div className="news-header" onClick={() => setCollapsed(!collapsed)}>
+      <div className="news-header">
         <h3>📰 地产行业要闻</h3>
         <span className="news-data-source">东方财富 · 政府网 · iFinD</span>
-        <span className="news-toggle">{collapsed ? '展开' : '收起'}</span>
         <span className="news-count">{displayItems.length} 条</span>
       </div>
-      {!collapsed && (
-        <>
-          <div className="news-list">
-            {displayItems.map((item, idx) => (
-              <div key={idx} className={`news-item ${item.type === 'announcement' ? 'news-item-announcement' : ''}`}>
-                <span className={`news-source ${item.type === 'announcement' ? 'news-source-ifind' : ''}`}>
-                  {item.source}
-                </span>
-                {item.url ? (
-                  <a href={item.url} target="_blank" rel="noopener noreferrer" className="news-title">
-                    {item.title}
-                  </a>
-                ) : (
-                  <span className="news-title">{item.title}</span>
-                )}
-                {item.time && <span className="news-time">{item.time}</span>}
-              </div>
-            ))}
+      <div className="news-list">
+        {displayItems.map((item, idx) => (
+          <div key={idx} className={`news-item ${item.type === 'announcement' ? 'news-item-announcement' : ''}`}>
+            <span className={`news-source ${item.type === 'announcement' ? 'news-source-ifind' : ''}`}>
+              {item.source}
+            </span>
+            {item.url ? (
+              <a href={item.url} target="_blank" rel="noopener noreferrer" className="news-title">
+                {item.title}
+              </a>
+            ) : (
+              <span className="news-title">{item.title}</span>
+            )}
+            {item.time && <span className="news-time">{item.time}</span>}
           </div>
-          {hasMore && (
-            <div className="news-more" onClick={handleExpand}>
-              查看更多资讯 ({allItems.length} 条)
-            </div>
-          )}
-          {expanded && allItems.length > 5 && (
-            <div className="news-more" onClick={() => setExpanded(false)}>
-              收起
-            </div>
-          )}
-        </>
+        ))}
+      </div>
+      {hasMore && (
+        <div className="news-more" onClick={handleExpand}>
+          查看更多 ({allItems.length} 条)
+        </div>
+      )}
+      {expanded && allItems.length > 5 && (
+        <div className="news-more" onClick={() => setExpanded(false)}>
+          收起
+        </div>
       )}
     </div>
   )

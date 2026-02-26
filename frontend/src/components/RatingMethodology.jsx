@@ -97,9 +97,6 @@ export default function RatingMethodology() {
                   desc="连涨/跌天数·振幅"
                 />
               </div>
-              <div className="methodology-data-note">
-                详情面板还展示更多iFinD数据供参考：多周期涨跌幅、资金流明细、换手率等（不计入评分）
-              </div>
             </div>
 
             {/* 右列: AI */}

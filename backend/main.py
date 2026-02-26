@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, func
 
 from app.api import router
-from app.config import REFRESH_HOUR, REFRESH_MINUTE, ADMIN_USERNAME, ADMIN_PASSWORD, UPLOAD_DIR
+from app.config import ADMIN_USERNAME, ADMIN_PASSWORD, UPLOAD_DIR
 from app.database import init_db, async_session
 from app.models import Rating, User
 from app.auth import hash_password
@@ -79,26 +79,18 @@ async def lifespan(app: FastAPI):
     await init_admin()
     logger.info("数据库初始化完成")
 
-    # 定时任务: 每天早上9点和下午16点各刷新一次
-    # 9:00 开盘前预刷新，16:00 收盘后用最新数据重新评级
-    scheduler.add_job(
-        refresh_all_data,
-        "cron",
-        hour=REFRESH_HOUR,
-        minute=REFRESH_MINUTE,
-        id="daily_refresh_morning",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        refresh_all_data,
-        "cron",
-        hour=16,
-        minute=0,
-        id="daily_refresh_afternoon",
-        replace_existing=True,
-    )
+    # 定时任务: 每天 9:00、12:00、15:00 三次数据刷新和评分
+    for hour, job_id in [(9, "refresh_09"), (12, "refresh_12"), (15, "refresh_15")]:
+        scheduler.add_job(
+            refresh_all_data,
+            "cron",
+            hour=hour,
+            minute=0,
+            id=job_id,
+            replace_existing=True,
+        )
     scheduler.start()
-    logger.info(f"定时任务已启动: 每天 {REFRESH_HOUR}:{REFRESH_MINUTE:02d} 和 16:00 自动计算评级")
+    logger.info("定时任务已启动: 每天 9:00、12:00、15:00 自动刷新数据和评级")
 
     # 启动时检查并自动刷新（后台异步执行，不阻塞启动）
     asyncio.create_task(check_and_refresh())
