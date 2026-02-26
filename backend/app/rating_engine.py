@@ -654,12 +654,11 @@ def calc_quant_score(df: pd.DataFrame) -> Dict[str, float]:
 # ========== 基本面评分（iFinD财务数据）==========
 
 def calc_fundamental_score(fundamentals: Optional[dict]) -> Optional[float]:
-    """基本面评分: 基于iFinD的PE/PB/ROE/EPS等财务数据
+    """基本面评分: 基于iFinD的PE/PB/ROE/EPS等财务数据 + 资金流 + 市场情绪
     房地产行业特定评分逻辑:
-      - PE_TTM: 负值减分，10-30合理区间加分
-      - PB_MRQ: <1破净有估值修复空间，1-2合理
-      - ROE: 越高越好，>10优秀
-      - 负债率: 房企普遍高，<80合理，>85预警
+      核心估值(60分): PE_TTM(18) + PB_MRQ(17) + ROE(13) + 负债率(12)
+      资金面(25分): 主力净流入(12) + 量比(8) + 委比(5)
+      市场情绪(15分): 连涨天数(8) + 振幅(7)
     """
     if not fundamentals:
         return None
@@ -668,85 +667,164 @@ def calc_fundamental_score(fundamentals: Optional[dict]) -> Optional[float]:
     pb = fundamentals.get("pb_mrq")
     roe = fundamentals.get("roe")
     debt_ratio = fundamentals.get("debt_ratio")
-    eps = fundamentals.get("eps")
 
     # 至少需要PE或PB才能评分
     if pe is None and pb is None:
         return None
 
     score = 0.0
-    count = 0
+    max_score = 0.0
 
-    # PE_TTM 评分 (0~30分)
+    # ═══ 核心估值（60分）═══
+
+    # PE_TTM (0~18分)
     if pe is not None:
-        count += 1
+        max_score += 18
         if pe < 0:
-            score += 5  # 亏损，低分
+            score += 3
         elif pe < 8:
-            score += 28  # 极低PE，深度价值
+            score += 18  # 极低PE，深度价值
         elif pe <= 15:
-            score += 25  # 低PE，价值区间
-        elif pe <= 30:
-            score += 18  # 合理PE
-        elif pe <= 50:
-            score += 10  # 偏高
-        else:
-            score += 5  # 极高PE
-
-    # PB_MRQ 评分 (0~25分) — 房地产行业特别关注PB
-    if pb is not None:
-        count += 1
-        if pb < 0:
-            score += 3  # 净资产为负
-        elif pb < 0.5:
-            score += 22  # 深度破净，可能有修复空间
-        elif pb < 1.0:
-            score += 25  # 破净，估值修复潜力大
-        elif pb < 1.5:
-            score += 20  # 合理区间
-        elif pb < 2.5:
-            score += 12  # 偏高
-        else:
-            score += 5  # 高溢价
-
-    # ROE 评分 (0~25分)
-    if roe is not None:
-        count += 1
-        if roe < 0:
-            score += 3  # 亏损
-        elif roe < 3:
-            score += 8
-        elif roe < 8:
             score += 15
+        elif pe <= 30:
+            score += 10
+        elif pe <= 50:
+            score += 5
+        else:
+            score += 2
+
+    # PB_MRQ (0~17分)
+    if pb is not None:
+        max_score += 17
+        if pb < 0:
+            score += 2
+        elif pb < 0.5:
+            score += 14  # 深度破净
+        elif pb < 1.0:
+            score += 17  # 破净，估值修复潜力大
+        elif pb < 1.5:
+            score += 13
+        elif pb < 2.5:
+            score += 7
+        else:
+            score += 2
+
+    # ROE (0~13分)
+    if roe is not None:
+        max_score += 13
+        if roe < 0:
+            score += 1
+        elif roe < 3:
+            score += 4
+        elif roe < 8:
+            score += 8
         elif roe < 15:
-            score += 22
+            score += 11
         else:
-            score += 25  # 高ROE
+            score += 13
 
-    # 负债率评分 (0~20分) — 房企三道红线视角
+    # 负债率 (0~12分) — 三道红线
     if debt_ratio is not None:
-        count += 1
+        max_score += 12
         if debt_ratio < 70:
-            score += 20  # 低负债，非常健康
+            score += 12
         elif debt_ratio < 75:
-            score += 16
+            score += 9
         elif debt_ratio < 80:
-            score += 12  # 行业平均水平
+            score += 6
         elif debt_ratio < 85:
-            score += 7  # 偏高
+            score += 3
         else:
-            score += 3  # 高负债预警
+            score += 1
 
-    if count == 0:
+    # ═══ 资金面（25分）═══
+
+    # 主力净流入 (0~12分)
+    mnf = fundamentals.get("main_net_inflow")
+    if mnf is not None:
+        max_score += 12
+        # mnf 单位万元，正=流入，负=流出
+        if mnf > 5000:
+            score += 12  # 大幅流入（>5000万）
+        elif mnf > 1000:
+            score += 10
+        elif mnf > 0:
+            score += 8
+        elif mnf > -1000:
+            score += 5
+        elif mnf > -5000:
+            score += 3
+        else:
+            score += 1  # 大幅流出
+
+    # 量比 (0~8分) — 温和放量最佳
+    vr = fundamentals.get("vol_ratio")
+    if vr is not None:
+        max_score += 8
+        if 0.8 <= vr <= 1.5:
+            score += 8  # 温和放量
+        elif 1.5 < vr <= 2.5:
+            score += 6  # 明显放量
+        elif 0.5 <= vr < 0.8:
+            score += 5  # 轻微缩量
+        elif vr > 2.5:
+            score += 3  # 异常放量
+        else:
+            score += 2  # 极度缩量
+
+    # 委比 (0~5分)
+    comm = fundamentals.get("committee")
+    if comm is not None:
+        max_score += 5
+        if comm > 30:
+            score += 5  # 强烈买盘
+        elif comm > 10:
+            score += 4
+        elif comm > -10:
+            score += 3  # 平衡
+        elif comm > -30:
+            score += 2
+        else:
+            score += 1  # 强烈卖盘
+
+    # ═══ 市场情绪（15分）═══
+
+    # 连涨天数 (0~8分)
+    rdc = fundamentals.get("rise_day_count")
+    if rdc is not None:
+        max_score += 8
+        if rdc >= 5:
+            score += 8
+        elif rdc >= 3:
+            score += 7
+        elif rdc >= 1:
+            score += 5
+        elif rdc == 0:
+            score += 4
+        elif rdc >= -2:
+            score += 3
+        elif rdc >= -4:
+            score += 2
+        else:
+            score += 1
+
+    # 振幅 (0~7分) — 低振幅=稳健
+    sw = fundamentals.get("swing")
+    if sw is not None:
+        max_score += 7
+        if sw < 2:
+            score += 7  # 极低振幅，走势稳健
+        elif sw < 4:
+            score += 5
+        elif sw < 6:
+            score += 3
+        else:
+            score += 1  # 高振幅，波动大
+
+    if max_score == 0:
         return None
 
-    # 归一化到0-100
-    max_possible = count * 25  # 每个指标平均25分
-    if max_possible > 0:
-        normalized = score / max_possible * 100
-    else:
-        normalized = 50.0
-
+    normalized = score / max_score * 100
     return _clamp(normalized)
 
 
@@ -1091,9 +1169,23 @@ async def rate_stock(df: pd.DataFrame, name: str = "", code: str = "", market: s
         result["eps"] = fundamentals.get("eps")
         result["market_value"] = fundamentals.get("market_value")
         result["debt_ratio"] = fundamentals.get("debt_ratio")
-        # 新增资金流数据
+        # 资金流数据
         result["main_net_inflow"] = fundamentals.get("main_net_inflow")
+        result["retail_net_inflow"] = fundamentals.get("retail_net_inflow")
+        result["large_net_inflow"] = fundamentals.get("large_net_inflow")
         result["rise_day_count"] = fundamentals.get("rise_day_count")
+        # 市场微观数据
+        result["vol_ratio"] = fundamentals.get("vol_ratio")
+        result["swing"] = fundamentals.get("swing")
+        result["committee"] = fundamentals.get("committee")
+        result["turnover_ratio"] = fundamentals.get("turnover_ratio")
+        # iFinD多周期涨跌幅
+        result["chg_5d"] = fundamentals.get("chg_5d")
+        result["chg_10d"] = fundamentals.get("chg_10d")
+        result["chg_20d"] = fundamentals.get("chg_20d")
+        result["chg_60d"] = fundamentals.get("chg_60d")
+        result["chg_120d"] = fundamentals.get("chg_120d")
+        result["chg_year"] = fundamentals.get("chg_year")
     if fundamental_score is not None:
         result["fundamental_score"] = round(fundamental_score, 2)
 

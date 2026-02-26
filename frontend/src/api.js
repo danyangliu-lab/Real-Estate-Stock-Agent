@@ -74,12 +74,21 @@ export const api = {
   getRatingTrend: (code, days = 30) => request(`/rating-trend/${code}?days=${days}`),
 
   // ========== 新闻资讯 ==========
-  getNews: (code, name) => {
+  getNews: (code, name, limit) => {
     const qs = new URLSearchParams()
     if (code) qs.set('code', code)
     if (name) qs.set('name', name)
+    if (limit) qs.set('limit', limit)
     const q = qs.toString()
     return request(`/news${q ? `?${q}` : ''}`)
+  },
+
+  // ========== 个股公告 ==========
+  getAnnouncements: (code, days = 90, limit = 10) => {
+    const qs = new URLSearchParams()
+    qs.set('days', days)
+    qs.set('limit', limit)
+    return request(`/announcements/${code}?${qs}`)
   },
 
   // ========== 市场点评 ==========

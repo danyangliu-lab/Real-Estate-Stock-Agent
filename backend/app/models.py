@@ -112,5 +112,18 @@ class Rating(Base):
     fundamental_score = Column(Float, nullable=True)
     # 资金流数据（来自iFinD实时行情）
     main_net_inflow = Column(Float, nullable=True)  # 主力净流入（万元）
+    retail_net_inflow = Column(Float, nullable=True)  # 散户净流入（万元）
+    large_net_inflow = Column(Float, nullable=True)  # 超大单净流入（万元）
     rise_day_count = Column(Integer, nullable=True)  # 连涨/跌天数
+    vol_ratio = Column(Float, nullable=True)  # 量比
+    swing = Column(Float, nullable=True)  # 振幅%
+    committee = Column(Float, nullable=True)  # 委比%
+    turnover_ratio = Column(Float, nullable=True)  # 换手率%
+    # iFinD多周期涨跌幅
+    chg_5d = Column(Float, nullable=True)
+    chg_10d = Column(Float, nullable=True)
+    chg_20d = Column(Float, nullable=True)
+    chg_60d = Column(Float, nullable=True)
+    chg_120d = Column(Float, nullable=True)
+    chg_year = Column(Float, nullable=True)  # 年初至今涨跌幅
     created_at = Column(DateTime, default=datetime.now)

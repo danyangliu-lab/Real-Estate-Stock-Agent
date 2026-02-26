@@ -12,6 +12,7 @@ export default function RatingMethodology() {
         <div className="methodology-title-row">
           <span className="methodology-icon">&#x1f4d0;</span>
           <span className="methodology-title">评级逻辑说明</span>
+          <span className="methodology-powered">Powered by 同花顺iFinD · 腾讯混元AI</span>
         </div>
         <span className={`methodology-arrow ${expanded ? 'expanded' : ''}`}>&#x25B6;</span>
       </div>
@@ -28,7 +29,7 @@ export default function RatingMethodology() {
             <span className="formula-plus">+</span>
             <span className="formula-part ai">AI大模型 × 45%</span>
           </div>
-          <div className="methodology-fallback">基本面数据来自同花顺iFinD（A股可用）；若基本面不可用则量化50%+AI50%；若AI不可用则自动降级</div>
+          <div className="methodology-fallback">基本面数据来自同花顺iFinD（含估值+资金流+市场情绪三维度）；若基本面不可用则量化50%+AI50%；若AI不可用则自动降级</div>
 
           <div className="methodology-columns">
             {/* 左列: 量化 */}
@@ -38,7 +39,7 @@ export default function RatingMethodology() {
                 量化技术评分 (40%)
               </div>
               <div className="methodology-col-desc">
-                基于近期行情数据，通过5个量化维度综合评估
+                基于iFinD实时行情数据，5个量化维度综合评估
               </div>
               <div className="dimension-list">
                 <DimensionItem
@@ -74,27 +75,30 @@ export default function RatingMethodology() {
               <div className="methodology-col-title">
                 <span className="col-dot" style={{background:'var(--green)'}} />
                 基本面评分 (15%)
+                <span className="ifind-badge-sm">iFinD</span>
               </div>
               <div className="methodology-col-desc">
-                基于同花顺iFinD实时财务数据，对A股进行估值和财务健康评估
+                基于同花顺iFinD实时数据，涵盖估值、资金面、市场情绪三个维度
               </div>
               <div className="dimension-list">
                 <DimensionItem
-                  name="PE(TTM)"
-                  desc="市盈率，负值为亏损，10-30为房企合理区间"
+                  name="核心估值"
+                  weight="60分"
+                  desc="PE(TTM)·PB(MRQ)·ROE·资产负债率(三道红线)"
                 />
                 <DimensionItem
-                  name="PB(MRQ)"
-                  desc="市净率，&lt;1破净有修复空间，房企PB普遍偏低"
+                  name="资金面"
+                  weight="25分"
+                  desc="主力净流入·量比·委比"
                 />
                 <DimensionItem
-                  name="ROE"
-                  desc="净资产收益率，反映盈利能力"
+                  name="市场情绪"
+                  weight="15分"
+                  desc="连涨/跌天数·振幅"
                 />
-                <DimensionItem
-                  name="资产负债率"
-                  desc="三道红线关键指标，&gt;85%为预警"
-                />
+              </div>
+              <div className="methodology-data-note">
+                详情面板还展示更多iFinD数据供参考：多周期涨跌幅、资金流明细、换手率等（不计入评分）
               </div>
             </div>
 
@@ -105,13 +109,13 @@ export default function RatingMethodology() {
                 AI大模型评分 (45%)
               </div>
               <div className="methodology-col-desc">
-                由腾讯混元2.0大模型结合实时资讯联网搜索进行专业分析
+                由腾讯混元2.0大模型结合iFinD数据+实时联网搜索进行专业分析
               </div>
               <div className="dimension-list">
                 <DimensionItem
                   name="政策资讯影响"
                   weight="35%"
-                  desc="最新房地产政策、调控文件、行业新闻、市场供需变化，实时联网获取"
+                  desc="最新房地产政策、调控文件、行业新闻、iFinD公告，实时联网获取"
                 />
                 <DimensionItem
                   name="公司基本面"
@@ -121,7 +125,7 @@ export default function RatingMethodology() {
                 <DimensionItem
                   name="技术面与资金面"
                   weight="25%"
-                  desc="价格趋势、机构资金动向、北向资金、筹码结构分析"
+                  desc="价格趋势、iFinD资金流向(主力/散户)、北向资金、筹码结构分析"
                 />
                 <DimensionItem
                   name="风险评估"

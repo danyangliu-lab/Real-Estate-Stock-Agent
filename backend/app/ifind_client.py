@@ -528,6 +528,12 @@ def fetch_fundamentals(code: str, market: str) -> Optional[dict]:
             # 振幅
             if rt_data.get("swing") is not None:
                 result["swing"] = round(rt_data["swing"], 2)
+            # 委比
+            if rt_data.get("committee") is not None:
+                result["committee"] = round(rt_data["committee"], 2)
+            # 换手率（从realtime补充）
+            if rt_data.get("turnover_ratio") is not None and not result.get("turnover_ratio"):
+                result["turnover_ratio"] = round(rt_data["turnover_ratio"], 2)
             # 多周期涨跌幅（从实时接口获取比手动计算更准确）
             for key in ["chg_5d", "chg_10d", "chg_20d", "chg_60d", "chg_120d", "chg_year"]:
                 if rt_data.get(key) is not None:

@@ -118,7 +118,20 @@ class RatingOut(BaseModel):
     fundamental_score: Optional[float] = None
     # 资金流数据
     main_net_inflow: Optional[float] = None
+    retail_net_inflow: Optional[float] = None
+    large_net_inflow: Optional[float] = None
     rise_day_count: Optional[int] = None
+    vol_ratio: Optional[float] = None
+    swing: Optional[float] = None
+    committee: Optional[float] = None
+    turnover_ratio: Optional[float] = None
+    # iFinD多周期涨跌幅
+    chg_5d: Optional[float] = None
+    chg_10d: Optional[float] = None
+    chg_20d: Optional[float] = None
+    chg_60d: Optional[float] = None
+    chg_120d: Optional[float] = None
+    chg_year: Optional[float] = None
 
     class Config:
         from_attributes = True

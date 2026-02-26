@@ -30,15 +30,39 @@ function getMarketLabel(market) {
   }
 }
 
+function ChgBadge({ value, label }) {
+  if (value == null) return null
+  const color = value > 0 ? 'var(--red)' : value < 0 ? 'var(--green)' : 'var(--text-muted)'
+  return (
+    <div className="chg-badge">
+      <span className="chg-badge-label">{label}</span>
+      <span className="chg-badge-value" style={{ color }}>
+        {value > 0 ? '+' : ''}{value.toFixed(2)}%
+      </span>
+    </div>
+  )
+}
+
+function formatMoney(val) {
+  if (val == null) return '--'
+  const absVal = Math.abs(val)
+  if (absVal >= 10000) return `${(val / 10000).toFixed(1)}亿`
+  if (absVal >= 1) return `${val.toFixed(0)}万`
+  return `${val.toFixed(2)}万`
+}
+
 export default function DetailPanel({ rating, onClose }) {
   const [prices, setPrices] = useState([])
   const [ratingTrend, setRatingTrend] = useState([])
   const [history, setHistory] = useState([])
+  const [announcements, setAnnouncements] = useState([])
+  const [annLoading, setAnnLoading] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (!rating) return
     setLoading(true)
+    setAnnLoading(true)
     Promise.all([
       api.getPrices(rating.code, 60).catch(() => []),
       api.getRatingTrend(rating.code, 60).catch(() => []),
@@ -49,6 +73,10 @@ export default function DetailPanel({ rating, onClose }) {
       setHistory(h)
       setLoading(false)
     })
+    api.getAnnouncements(rating.code, 90, 10)
+      .then(data => setAnnouncements(data || []))
+      .catch(() => setAnnouncements([]))
+      .finally(() => setAnnLoading(false))
   }, [rating])
 
   useEffect(() => {
@@ -59,7 +87,6 @@ export default function DetailPanel({ rating, onClose }) {
 
   if (!rating) return null
 
-  // 计算量化综合分（5维度加权，保留2位小数）
   const quantScore = (
     rating.trend_score * 0.25 +
     rating.momentum_score * 0.20 +
@@ -76,6 +103,11 @@ export default function DetailPanel({ rating, onClose }) {
     { label: '价值评分', value: rating.value_score, key: 'value' },
     { label: 'AI评分', value: rating.ai_score, key: 'ai' },
   ]
+
+  const hasValuation = rating.pe_ttm != null || rating.pb_mrq != null
+  const hasMoneyFlow = rating.main_net_inflow != null
+  const hasChgData = rating.chg_5d != null || rating.chg_20d != null || rating.chg_year != null
+  const hasMicroData = rating.vol_ratio != null || rating.swing != null || rating.committee != null
 
   return (
     <div className="detail-overlay" onClick={onClose}>
@@ -109,10 +141,13 @@ export default function DetailPanel({ rating, onClose }) {
             )}
           </div>
 
-          {/* 财务数据（来自iFinD） */}
-          {(rating.pe_ttm != null || rating.pb_mrq != null || rating.roe != null) && (
+          {/* ═══ iFinD 核心估值 ═══ */}
+          {(hasValuation || rating.roe != null) && (
             <div className="detail-section">
-              <div className="detail-section-title">财务数据 <span style={{fontSize:11,color:'var(--text-muted)',fontWeight:400}}>（同花顺iFinD）</span></div>
+              <div className="detail-section-title">
+                核心估值
+                <span className="ifind-badge">iFinD</span>
+              </div>
               <div className="scores-grid">
                 {rating.pe_ttm != null && (
                   <div className="score-item">
@@ -152,25 +187,9 @@ export default function DetailPanel({ rating, onClose }) {
                 )}
                 {rating.debt_ratio != null && (
                   <div className="score-item">
-                    <div className="score-item-label">负债率</div>
+                    <div className="score-item-label">资产负债率</div>
                     <div className="score-item-value" style={{ color: rating.debt_ratio > 85 ? 'var(--red)' : rating.debt_ratio > 80 ? 'var(--orange)' : 'var(--green)' }}>
                       {rating.debt_ratio.toFixed(1)}%
-                    </div>
-                  </div>
-                )}
-                {rating.main_net_inflow != null && (
-                  <div className="score-item">
-                    <div className="score-item-label">主力净流入</div>
-                    <div className="score-item-value" style={{ color: rating.main_net_inflow > 0 ? 'var(--red)' : 'var(--green)' }}>
-                      {rating.main_net_inflow > 0 ? '+' : ''}{(rating.main_net_inflow / 10000).toFixed(1)}亿
-                    </div>
-                  </div>
-                )}
-                {rating.rise_day_count != null && (
-                  <div className="score-item">
-                    <div className="score-item-label">{rating.rise_day_count >= 0 ? '连涨' : '连跌'}</div>
-                    <div className="score-item-value" style={{ color: rating.rise_day_count > 0 ? 'var(--red)' : rating.rise_day_count < 0 ? 'var(--green)' : 'var(--text-muted)' }}>
-                      {Math.abs(rating.rise_day_count)}天
                     </div>
                   </div>
                 )}
@@ -186,9 +205,118 @@ export default function DetailPanel({ rating, onClose }) {
             </div>
           )}
 
+          {/* ═══ iFinD 多周期涨跌幅 ═══ */}
+          {hasChgData && (
+            <div className="detail-section">
+              <div className="detail-section-title">
+                多周期涨跌幅
+                <span className="ifind-badge">iFinD</span>
+              </div>
+              <div className="chg-grid">
+                <ChgBadge value={rating.chg_5d} label="5日" />
+                <ChgBadge value={rating.chg_10d} label="10日" />
+                <ChgBadge value={rating.chg_20d} label="20日" />
+                <ChgBadge value={rating.chg_60d} label="60日" />
+                <ChgBadge value={rating.chg_120d} label="120日" />
+                <ChgBadge value={rating.chg_year} label="年初至今" />
+              </div>
+            </div>
+          )}
+
+          {/* ═══ iFinD 资金流向 ═══ */}
+          {hasMoneyFlow && (
+            <div className="detail-section">
+              <div className="detail-section-title">
+                资金流向
+                <span className="ifind-badge">iFinD</span>
+              </div>
+              <div className="money-flow-grid">
+                <div className="money-flow-item money-flow-main">
+                  <div className="money-flow-label">主力净流入</div>
+                  <div className="money-flow-value" style={{ color: rating.main_net_inflow > 0 ? 'var(--red)' : 'var(--green)' }}>
+                    {rating.main_net_inflow > 0 ? '+' : ''}{formatMoney(rating.main_net_inflow)}
+                  </div>
+                  <div className="money-flow-bar">
+                    <div
+                      className="money-flow-bar-fill"
+                      style={{
+                        width: `${Math.min(Math.abs(rating.main_net_inflow || 0) / 50000 * 100, 100)}%`,
+                        background: rating.main_net_inflow > 0 ? 'var(--red)' : 'var(--green)',
+                      }}
+                    />
+                  </div>
+                </div>
+                {rating.retail_net_inflow != null && (
+                  <div className="money-flow-item">
+                    <div className="money-flow-label">散户净流入</div>
+                    <div className="money-flow-value" style={{ color: rating.retail_net_inflow > 0 ? 'var(--red)' : 'var(--green)', fontSize: 14 }}>
+                      {rating.retail_net_inflow > 0 ? '+' : ''}{formatMoney(rating.retail_net_inflow)}
+                    </div>
+                  </div>
+                )}
+                {rating.large_net_inflow != null && (
+                  <div className="money-flow-item">
+                    <div className="money-flow-label">超大单净流入</div>
+                    <div className="money-flow-value" style={{ color: rating.large_net_inflow > 0 ? 'var(--red)' : 'var(--green)', fontSize: 14 }}>
+                      {rating.large_net_inflow > 0 ? '+' : ''}{formatMoney(rating.large_net_inflow)}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ═══ iFinD 市场微观 ═══ */}
+          {(hasMicroData || rating.rise_day_count != null || rating.turnover_ratio != null) && (
+            <div className="detail-section">
+              <div className="detail-section-title">
+                市场微观数据
+                <span className="ifind-badge">iFinD</span>
+              </div>
+              <div className="scores-grid">
+                {rating.vol_ratio != null && (
+                  <div className="score-item">
+                    <div className="score-item-label">量比</div>
+                    <div className="score-item-value" style={{ color: rating.vol_ratio > 2 ? 'var(--red)' : rating.vol_ratio > 1 ? 'var(--orange)' : 'var(--text-primary)' }}>
+                      {rating.vol_ratio.toFixed(2)}
+                    </div>
+                  </div>
+                )}
+                {rating.turnover_ratio != null && (
+                  <div className="score-item">
+                    <div className="score-item-label">换手率</div>
+                    <div className="score-item-value">{rating.turnover_ratio.toFixed(2)}%</div>
+                  </div>
+                )}
+                {rating.committee != null && (
+                  <div className="score-item">
+                    <div className="score-item-label">委比</div>
+                    <div className="score-item-value" style={{ color: rating.committee > 0 ? 'var(--red)' : 'var(--green)' }}>
+                      {rating.committee > 0 ? '+' : ''}{rating.committee.toFixed(2)}%
+                    </div>
+                  </div>
+                )}
+                {rating.swing != null && (
+                  <div className="score-item">
+                    <div className="score-item-label">振幅</div>
+                    <div className="score-item-value">{rating.swing.toFixed(2)}%</div>
+                  </div>
+                )}
+                {rating.rise_day_count != null && (
+                  <div className="score-item">
+                    <div className="score-item-label">{rating.rise_day_count >= 0 ? '连涨' : '连跌'}</div>
+                    <div className="score-item-value" style={{ color: rating.rise_day_count > 0 ? 'var(--red)' : rating.rise_day_count < 0 ? 'var(--green)' : 'var(--text-muted)' }}>
+                      {Math.abs(rating.rise_day_count)}天
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* 维度评分 */}
           <div className="detail-section">
-            <div className="detail-section-title">维度评分</div>
+            <div className="detail-section-title">量化维度评分</div>
             <div className="scores-grid">
               {scores.map(s => (
                 <div className="score-item" key={s.key}>
@@ -243,6 +371,38 @@ export default function DetailPanel({ rating, onClose }) {
               </div>
             ) : (
               <div className="reason-text">{rating.reason}</div>
+            )}
+          </div>
+
+          {/* ═══ iFinD 公告与财报 ═══ */}
+          <div className="detail-section">
+            <div className="detail-section-title">
+              公告与财报
+              <span className="ifind-badge">iFinD</span>
+            </div>
+            {annLoading ? (
+              <div className="ann-loading">加载公告中...</div>
+            ) : announcements.length > 0 ? (
+              <div className="ann-list">
+                {announcements.map((ann, idx) => (
+                  <div key={idx} className={`ann-item${ann.is_financial ? ' ann-financial' : ann.is_key ? ' ann-key' : ''}`}>
+                    <div className="ann-item-header">
+                      {ann.is_financial && <span className="ann-tag ann-tag-fin">财报</span>}
+                      {!ann.is_financial && ann.is_key && <span className="ann-tag ann-tag-key">重点</span>}
+                      <span className="ann-date">{ann.date}</span>
+                    </div>
+                    <div className="ann-title">
+                      {ann.pdf_url ? (
+                        <a href={ann.pdf_url} target="_blank" rel="noopener noreferrer">{ann.title}</a>
+                      ) : (
+                        ann.title
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="ann-empty">暂无近期公告数据</div>
             )}
           </div>
 
@@ -346,6 +506,11 @@ export default function DetailPanel({ rating, onClose }) {
               </div>
             </div>
           )}
+
+          {/* 数据来源 */}
+          <div className="detail-data-source">
+            数据来源：同花顺iFinD · 东方财富 · 腾讯混元AI · 中国政府网
+          </div>
         </div>
       </div>
     </div>

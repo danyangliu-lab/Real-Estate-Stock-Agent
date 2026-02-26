@@ -21,6 +21,7 @@ from app.config import UPLOAD_DIR
 from app.database import get_db
 from app.models import Stock, Rating, StockPrice, User, Commentary, Report
 from app.news_fetcher import fetch_filtered_news, fetch_stock_news
+from app.ifind_client import fetch_recent_announcements, fetch_reports
 from app.schemas import (
     StockOut, RatingOut, PriceOut, DashboardStats, RatingHistoryOut,
     LoginRequest, RegisterRequest, TokenResponse, UserOut,
@@ -162,22 +163,127 @@ async def get_dashboard(db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/news")
-async def get_news(code: Optional[str] = Query(None), name: Optional[str] = Query(None)):
-    """获取房地产行业新闻资讯（AI筛选，返回最重要的5条）"""
+async def get_news(
+    code: Optional[str] = Query(None),
+    name: Optional[str] = Query(None),
+    limit: int = Query(5, ge=1, le=20),
+):
+    """获取房地产行业新闻+公告资讯（AI筛选）
+    limit: 返回条数（默认5，可扩展到10）
+    """
     import asyncio
 
-    # 行业新闻：经过 AI 筛选的 top 5
-    industry_news = await fetch_filtered_news(5)
+    # 行业新闻：经过 AI 筛选的 top N
+    industry_news = await fetch_filtered_news(limit)
 
     # 个股新闻
     stock_news = []
     if code and name:
-        stock_news = await asyncio.to_thread(fetch_stock_news, code, name, 5)
+        stock_news = await asyncio.to_thread(fetch_stock_news, code, name, limit)
+
+    # 个股公告（来自iFinD）
+    announcements = []
+    if code:
+        try:
+            market = "A"
+            # 从数据库查询股票的市场类型
+            # 简单判断：5位数字开头为港股
+            if code.startswith("0") and len(code) == 5:
+                market = "HK"
+            elif not code[0].isdigit():
+                market = "US"
+            raw = await asyncio.to_thread(
+                fetch_recent_announcements, code, market, 60
+            )
+            if raw:
+                for line in raw.split("\n"):
+                    line = line.strip()
+                    if line.startswith("["):
+                        # 格式: [2026-02-20] 标题
+                        parts = line.split("]", 1)
+                        if len(parts) == 2:
+                            date_str = parts[0].lstrip("[").strip()
+                            title = parts[1].strip()
+                            announcements.append({
+                                "title": title,
+                                "source": "iFinD公告",
+                                "time": date_str,
+                                "url": "",
+                                "type": "announcement",
+                            })
+        except Exception:
+            pass
 
     return {
-        "industry_news": industry_news,
-        "stock_news": stock_news[:5],
+        "industry_news": industry_news[:limit],
+        "stock_news": stock_news[:limit],
+        "announcements": announcements[:limit],
     }
+
+
+@router.get("/announcements/{code}")
+async def get_stock_announcements(
+    code: str,
+    days: int = Query(90, ge=1, le=365),
+    limit: int = Query(10, ge=1, le=30),
+):
+    """获取单只股票的近期公告与财报（来自iFinD）"""
+    import asyncio
+
+    # 判断市场
+    market = "A"
+    if code.startswith("0") and len(code) == 5:
+        market = "HK"
+    elif not code[0].isdigit():
+        market = "US"
+
+    # 并发获取：全部公告 + 财报类关键词公告
+    all_reports, financial_reports = await asyncio.gather(
+        asyncio.to_thread(fetch_reports, [code], market, days),
+        asyncio.to_thread(fetch_reports, [code], market, min(days, 365), "903", "年度报告,半年度报告,季度报告,业绩预告,业绩快报"),
+    )
+
+    # 财报标题集合（用于标记）
+    fin_titles = set()
+    if financial_reports:
+        for r in financial_reports:
+            fin_titles.add(r.get("report_title", ""))
+
+    # 关键公告关键词（高亮重点）
+    KEY_WORDS = ["年度报告", "半年度报告", "季度报告", "业绩预告", "业绩快报",
+                 "利润分配", "分红", "增持", "减持", "回购", "股权激励",
+                 "重大合同", "中标", "收购", "出售", "关联交易", "担保",
+                 "评级", "信用", "债券"]
+
+    items = []
+    if all_reports:
+        for r in all_reports:
+            title = r.get("report_title", "")
+            if not title:
+                continue
+            is_financial = title in fin_titles or any(kw in title for kw in ["年度报告", "半年度报告", "季度报告", "业绩预告", "业绩快报"])
+            is_key = is_financial or any(kw in title for kw in KEY_WORDS)
+            items.append({
+                "title": title,
+                "date": r.get("report_date", ""),
+                "pdf_url": r.get("pdf_url", ""),
+                "is_financial": is_financial,
+                "is_key": is_key,
+            })
+
+    # 重点公告排前面，同等级别按日期倒序
+    items.sort(key=lambda x: (not x["is_financial"], not x["is_key"], x["date"]), reverse=False)
+    # 修正排序：先财报、再重点、再普通，每组内按日期倒序
+    items.sort(key=lambda x: (0 if x["is_financial"] else (1 if x["is_key"] else 2), x["date"]), reverse=False)
+    items.sort(key=lambda x: (0 if x["is_financial"] else (1 if x["is_key"] else 2)))
+    # 每个类别内按日期倒序
+    from itertools import groupby
+    sorted_items = []
+    for _, group in groupby(items, key=lambda x: (0 if x["is_financial"] else (1 if x["is_key"] else 2))):
+        g = sorted(list(group), key=lambda x: x["date"], reverse=True)
+        sorted_items.extend(g)
+
+    return sorted_items[:limit]
 
 
 @router.get("/stocks", response_model=list[StockOut])
