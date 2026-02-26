@@ -4,7 +4,7 @@ import { api } from '../api'
 export default function NewsSection() {
   const [news, setNews] = useState({ industry_news: [], stock_news: [], announcements: [] })
   const [loading, setLoading] = useState(true)
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function NewsSection() {
     return (
       <div className="news-section">
         <div className="news-header">
-          <h3>📰 新闻资讯与公告</h3>
+          <h3>📰 地产行业要闻</h3>
           <span className="news-data-source">数据来源：东方财富 · 中国政府网 · 同花顺iFinD</span>
         </div>
         <div className="news-loading">加载资讯中...</div>
@@ -60,7 +60,7 @@ export default function NewsSection() {
     return (
       <div className="news-section">
         <div className="news-header">
-          <h3>📰 新闻资讯与公告</h3>
+          <h3>📰 地产行业要闻</h3>
           <span className="news-data-source">数据来源：东方财富 · 中国政府网 · 同花顺iFinD</span>
         </div>
         <div className="news-empty">暂无资讯数据，将在下次刷新时获取</div>
@@ -71,7 +71,7 @@ export default function NewsSection() {
   return (
     <div className="news-section">
       <div className="news-header" onClick={() => setCollapsed(!collapsed)}>
-        <h3>📰 新闻资讯与公告</h3>
+        <h3>📰 地产行业要闻</h3>
         <span className="news-data-source">东方财富 · 政府网 · iFinD</span>
         <span className="news-toggle">{collapsed ? '展开' : '收起'}</span>
         <span className="news-count">{displayItems.length} 条</span>

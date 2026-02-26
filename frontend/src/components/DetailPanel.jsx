@@ -51,7 +51,7 @@ function formatMoney(val) {
   return `${val.toFixed(2)}万`
 }
 
-export default function DetailPanel({ rating, onClose }) {
+export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
   const [prices, setPrices] = useState([])
   const [ratingTrend, setRatingTrend] = useState([])
   const [history, setHistory] = useState([])
@@ -62,7 +62,6 @@ export default function DetailPanel({ rating, onClose }) {
   useEffect(() => {
     if (!rating) return
     setLoading(true)
-    setAnnLoading(true)
     Promise.all([
       api.getPrices(rating.code, 60).catch(() => []),
       api.getRatingTrend(rating.code, 60).catch(() => []),
@@ -73,11 +72,18 @@ export default function DetailPanel({ rating, onClose }) {
       setHistory(h)
       setLoading(false)
     })
-    api.getAnnouncements(rating.code, 90, 10)
-      .then(data => setAnnouncements(data || []))
-      .catch(() => setAnnouncements([]))
-      .finally(() => setAnnLoading(false))
-  }, [rating])
+    // 优先使用父组件预加载的缓存数据
+    if (cachedAnnouncements != null) {
+      setAnnouncements(cachedAnnouncements)
+      setAnnLoading(false)
+    } else {
+      setAnnLoading(true)
+      api.getAnnouncements(rating.code, 90, 10)
+        .then(data => setAnnouncements(data || []))
+        .catch(() => setAnnouncements([]))
+        .finally(() => setAnnLoading(false))
+    }
+  }, [rating, cachedAnnouncements])
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()

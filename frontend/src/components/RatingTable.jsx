@@ -7,8 +7,6 @@ const COLUMNS = [
   { key: 'total_score', label: '综合评分', sortable: true },
   { key: 'rating', label: '评级', sortable: false },
   { key: 'ai_score', label: 'AI评分', sortable: true },
-  { key: 'pe_ttm', label: 'PE', sortable: false },
-  { key: 'pb_mrq', label: 'PB', sortable: false },
   { key: 'trend_score', label: '趋势', sortable: true },
   { key: 'momentum_score', label: '动量', sortable: true },
   { key: 'volatility_score', label: '波动', sortable: true },
@@ -115,24 +113,6 @@ export default function RatingTable({ ratings, sortBy, sortDir, onSort, onSelect
                 {r.ai_score > 0 ? (
                   <span style={{ fontSize: 13, fontWeight: 600, color: getScoreColor(r.ai_score) }}>
                     {typeof r.ai_score === 'number' ? r.ai_score.toFixed(2) : r.ai_score}
-                  </span>
-                ) : (
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>--</span>
-                )}
-              </td>
-              <td>
-                {r.pe_ttm != null ? (
-                  <span style={{ fontSize: 12, color: r.pe_ttm < 0 ? 'var(--red)' : r.pe_ttm < 30 ? 'var(--green)' : 'var(--orange)' }}>
-                    {r.pe_ttm.toFixed(1)}
-                  </span>
-                ) : (
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>--</span>
-                )}
-              </td>
-              <td>
-                {r.pb_mrq != null ? (
-                  <span style={{ fontSize: 12, color: r.pb_mrq < 1 ? 'var(--accent)' : 'var(--text-secondary)' }}>
-                    {r.pb_mrq.toFixed(2)}{r.pb_mrq < 1 && r.pb_mrq > 0 ? '↓' : ''}
                   </span>
                 ) : (
                   <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>--</span>

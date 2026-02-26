@@ -43,6 +43,7 @@ export default function App() {
   const [ratings, setRatings] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedStock, setSelectedStock] = useState(null)
+  const [annCache, setAnnCache] = useState({})
   const [marketFilter, setMarketFilter] = useState('')
   const [ratingFilter, setRatingFilter] = useState('')
   const [sortBy, setSortBy] = useState('total_score')
@@ -120,6 +121,15 @@ export default function App() {
       setSortDir('desc')
     }
   }
+
+  const handleSelectStock = useCallback((stock) => {
+    setSelectedStock(stock)
+    if (stock && !annCache[stock.code]) {
+      api.getAnnouncements(stock.code, 90, 10)
+        .then(data => setAnnCache(prev => ({ ...prev, [stock.code]: data || [] })))
+        .catch(() => setAnnCache(prev => ({ ...prev, [stock.code]: [] })))
+    }
+  }, [annCache])
 
   const handleLogout = () => {
     removeToken()
@@ -251,7 +261,7 @@ export default function App() {
                 sortBy={sortBy}
                 sortDir={sortDir}
                 onSort={handleSort}
-                onSelect={setSelectedStock}
+                onSelect={handleSelectStock}
               />
             )}
           </>
@@ -271,6 +281,7 @@ export default function App() {
       {selectedStock && (
         <DetailPanel
           rating={selectedStock}
+          cachedAnnouncements={annCache[selectedStock.code]}
           onClose={() => setSelectedStock(null)}
         />
       )}
