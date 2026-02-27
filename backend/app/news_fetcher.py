@@ -116,13 +116,16 @@ def _fetch_eastmoney_search(keyword: str, page_size: int = 15) -> List[Dict]:
 
 
 def _fetch_gov_cn() -> List[Dict]:
-    """中国政府网 - 房地产相关政策文件"""
+    """中国政府网 - 房地产相关政策文件（最近30天内）"""
     news = []
     try:
+        from datetime import timedelta
+        max_time = datetime.now().strftime("%Y-%m-%d")
+        min_time = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
         url = (
-            "http://sousuo.www.gov.cn/search-gov/data?"
-            "t=zhengce_gw&q=房地产&timetype=timeqb&mintime=&maxtime="
-            "&sort=pubtime&sortType=1&searchfield=title&p=0&n=5"
+            f"http://sousuo.www.gov.cn/search-gov/data?"
+            f"t=zhengce_gw&q=房地产&timetype=timeqb&mintime={min_time}&maxtime={max_time}"
+            f"&sort=pubtime&sortType=1&searchfield=title&p=0&n=5"
         )
         resp = requests.get(url, headers=_get_json_headers(), timeout=10)
         if resp.status_code == 200:
@@ -239,15 +242,34 @@ def fetch_all_industry_news() -> List[Dict]:
     从多个数据源获取房地产行业新闻
     主力：东方财富搜索 API（多关键词）
     补充：中国政府网政策库
-    返回去重后的新闻列表（尚未经过AI筛选）
+    返回去重后的新闻列表（尚未经过AI筛选），只保留最近30天内的新闻
     """
     cache_key = "all_industry_raw"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
 
+    # 30天前的日期字符串，用于过滤旧新闻
+    from datetime import timedelta
+    cutoff = (datetime.now() - timedelta(days=30)).strftime("%Y")  # 至少是今年或去年
+    cutoff_full = (datetime.now() - timedelta(days=30)).strftime("%Y-%m-%d")
+
     all_news = []
     existing_titles = set()
+
+    def _is_recent(time_str: str) -> bool:
+        """检查新闻日期是否在最近30天内"""
+        if not time_str:
+            return True  # 没有日期的默认保留
+        # 提取日期部分（兼容多种格式）
+        date_match = re.search(r'(\d{4})[-./ ]?(\d{1,2})[-./ ]?(\d{1,2})', time_str)
+        if not date_match:
+            return True  # 无法解析日期，默认保留
+        try:
+            date_str = f"{date_match.group(1)}-{date_match.group(2).zfill(2)}-{date_match.group(3).zfill(2)}"
+            return date_str >= cutoff_full
+        except Exception:
+            return True
 
     def _add_news(items: List[Dict]):
         for n in items:
@@ -256,6 +278,9 @@ def fetch_all_industry_news() -> List[Dict]:
                 continue
             short = title[:15]
             if any(short == t[:15] for t in existing_titles):
+                continue
+            # 过滤旧新闻
+            if not _is_recent(n.get("time", "")):
                 continue
             existing_titles.add(title)
             all_news.append(n)
@@ -276,7 +301,14 @@ def fetch_all_industry_news() -> List[Dict]:
     except Exception as e:
         logger.warning(f"中国政府网异常: {e}")
 
-    logger.info(f"新闻汇总: 共 {len(all_news)} 条（去重后）")
+    # 按时间倒序排列
+    def _sort_key(n):
+        t = n.get("time", "")
+        m = re.search(r'(\d{4}[-./ ]?\d{1,2}[-./ ]?\d{1,2})', t)
+        return m.group(1) if m else "0000-00-00"
+    all_news.sort(key=_sort_key, reverse=True)
+
+    logger.info(f"新闻汇总: 共 {len(all_news)} 条（去重+过滤旧闻后）")
     _set_cache(cache_key, all_news)
     return all_news
 
