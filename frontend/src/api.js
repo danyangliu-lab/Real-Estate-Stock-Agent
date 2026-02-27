@@ -55,7 +55,10 @@ export const api = {
   deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
 
   // ========== 评级（原有） ==========
-  getDashboard: () => request('/dashboard'),
+  getDashboard: (model_type) => {
+    const qs = model_type ? `?model_type=${model_type}` : ''
+    return request(`/dashboard${qs}`)
+  },
   getStocks: (market) => request(`/stocks${market ? `?market=${market}` : ''}`),
   getLatestRatings: (params = {}) => {
     const qs = new URLSearchParams()
@@ -63,15 +66,33 @@ export const api = {
     if (params.rating) qs.set('rating', params.rating)
     if (params.sort_by) qs.set('sort_by', params.sort_by)
     if (params.sort_dir) qs.set('sort_dir', params.sort_dir)
+    if (params.model_type) qs.set('model_type', params.model_type)
     const q = qs.toString()
     return request(`/ratings/latest${q ? `?${q}` : ''}`)
   },
-  getRatingHistory: (code, days = 30) => request(`/ratings/history/${code}?days=${days}`),
-  getRatingsByDate: (date, market) =>
-    request(`/ratings/date/${date}${market ? `?market=${market}` : ''}`),
-  getAvailableDates: () => request('/ratings/dates'),
+  getRatingHistory: (code, days = 30, model_type) => {
+    const qs = new URLSearchParams()
+    qs.set('days', days)
+    if (model_type) qs.set('model_type', model_type)
+    return request(`/ratings/history/${code}?${qs}`)
+  },
+  getRatingsByDate: (date, market, model_type) => {
+    const qs = new URLSearchParams()
+    if (market) qs.set('market', market)
+    if (model_type) qs.set('model_type', model_type)
+    return request(`/ratings/date/${date}?${qs}`)
+  },
+  getAvailableDates: (model_type) => {
+    const qs = model_type ? `?model_type=${model_type}` : ''
+    return request(`/ratings/dates${qs}`)
+  },
   getPrices: (code, days = 60) => request(`/prices/${code}?days=${days}`),
-  getRatingTrend: (code, days = 30) => request(`/rating-trend/${code}?days=${days}`),
+  getRatingTrend: (code, days = 30, model_type) => {
+    const qs = new URLSearchParams()
+    qs.set('days', days)
+    if (model_type) qs.set('model_type', model_type)
+    return request(`/rating-trend/${code}?${qs}`)
+  },
 
   // ========== 新闻资讯 ==========
   getNews: (code, name, limit) => {

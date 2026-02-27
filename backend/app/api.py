@@ -116,16 +116,21 @@ async def delete_user(
 # ========== 仪表盘和评级接口（保持原有） ==========
 
 @router.get("/dashboard", response_model=DashboardStats)
-async def get_dashboard(db: AsyncSession = Depends(get_db)):
+async def get_dashboard(
+    model_type: str = Query("quant_ai"),
+    db: AsyncSession = Depends(get_db),
+):
     """仪表盘统计数据"""
     total = await db.scalar(select(func.count(Stock.id)).where(Stock.is_active == 1))
-    latest_date = await db.scalar(select(func.max(Rating.date)))
+    latest_date = await db.scalar(
+        select(func.max(Rating.date)).where(Rating.model_type == model_type)
+    )
     if not latest_date:
         return DashboardStats(
             total_stocks=total or 0, rated_today=0, avg_score=0,
             market_distribution={}, rating_distribution={}
         )
-    rated_q = select(Rating).where(Rating.date == latest_date)
+    rated_q = select(Rating).where(Rating.date == latest_date, Rating.model_type == model_type)
     result = await db.execute(rated_q)
     ratings = result.scalars().all()
     rated_count = len(ratings)
@@ -306,13 +311,16 @@ async def get_latest_ratings(
     rating: Optional[str] = Query(None),
     sort_by: Optional[str] = Query("total_score"),
     sort_dir: Optional[str] = Query("desc"),
+    model_type: str = Query("quant_ai"),
     db: AsyncSession = Depends(get_db),
 ):
     """获取最新一期评级"""
-    latest_date = await db.scalar(select(func.max(Rating.date)))
+    latest_date = await db.scalar(
+        select(func.max(Rating.date)).where(Rating.model_type == model_type)
+    )
     if not latest_date:
         return []
-    q = select(Rating).where(Rating.date == latest_date)
+    q = select(Rating).where(Rating.date == latest_date, Rating.model_type == model_type)
     if market:
         q = q.where(Rating.market == market)
     if rating:
@@ -334,13 +342,14 @@ async def get_latest_ratings(
 async def get_rating_history(
     code: str,
     days: int = Query(30, ge=1, le=365),
+    model_type: str = Query("quant_ai"),
     db: AsyncSession = Depends(get_db),
 ):
     """获取某只股票的历史评级"""
     since = date.today() - timedelta(days=days)
     q = (
         select(Rating)
-        .where(Rating.code == code, Rating.date >= since)
+        .where(Rating.code == code, Rating.date >= since, Rating.model_type == model_type)
         .order_by(desc(Rating.date))
     )
     result = await db.execute(q)
@@ -351,10 +360,11 @@ async def get_rating_history(
 async def get_ratings_by_date(
     target_date: date,
     market: Optional[str] = Query(None),
+    model_type: str = Query("quant_ai"),
     db: AsyncSession = Depends(get_db),
 ):
     """获取指定日期的评级"""
-    q = select(Rating).where(Rating.date == target_date)
+    q = select(Rating).where(Rating.date == target_date, Rating.model_type == model_type)
     if market:
         q = q.where(Rating.market == market)
     q = q.order_by(desc(Rating.total_score))
@@ -363,9 +373,18 @@ async def get_ratings_by_date(
 
 
 @router.get("/ratings/dates", response_model=list[date])
-async def get_available_dates(db: AsyncSession = Depends(get_db)):
+async def get_available_dates(
+    model_type: str = Query("quant_ai"),
+    db: AsyncSession = Depends(get_db),
+):
     """获取所有有评级数据的日期"""
-    q = select(Rating.date).distinct().order_by(desc(Rating.date)).limit(90)
+    q = (
+        select(Rating.date)
+        .where(Rating.model_type == model_type)
+        .distinct()
+        .order_by(desc(Rating.date))
+        .limit(90)
+    )
     result = await db.execute(q)
     return [row[0] for row in result.all()]
 
@@ -391,13 +410,14 @@ async def get_prices(
 async def get_rating_trend(
     code: str,
     days: int = Query(30, ge=1, le=365),
+    model_type: str = Query("quant_ai"),
     db: AsyncSession = Depends(get_db),
 ):
     """获取评分趋势"""
     since = date.today() - timedelta(days=days)
     q = (
         select(Rating.date, Rating.total_score, Rating.rating)
-        .where(Rating.code == code, Rating.date >= since)
+        .where(Rating.code == code, Rating.date >= since, Rating.model_type == model_type)
         .order_by(Rating.date)
     )
     result = await db.execute(q)

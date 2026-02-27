@@ -1246,3 +1246,381 @@ async def rate_stock(df: pd.DataFrame, name: str = "", code: str = "", market: s
         result["fundamental_score"] = round(fundamental_score, 2)
 
     return result
+
+
+# ========================================================================
+# 东吴地产选股模型（基本面70% + AI30%）
+# 核心逻辑：
+#   宏观层面 - 5年LPR利率下行、社会融资规模环比提升
+#   行业层面 - 新闻包含"放松限购/政策宽松/止跌企稳"等宽松信号
+#   个股层面 - 收入增长稳健、计提减值充分、满足三条红线
+#   估值层面 - PB < 1
+# ========================================================================
+
+SOOCHOW_FUND_RATIO = 0.70   # 基本面评分占比
+SOOCHOW_AI_RATIO = 0.30     # AI评分占比
+SOOCHOW_FUND_NO_AI = 1.00   # AI不可用时100%基本面
+
+SOOCHOW_AI_PROMPT = """你是东吴证券地产研究团队的资深分析师，专注中国房地产行业基本面研究。
+
+你的分析框架（按重要性排序）：
+
+【一、宏观环境评估（权重25%）】
+1. 利率环境：5年期LPR走势，是否处于下行通道（利好地产）
+2. 融资环境：社会融资规模是否环比/同比提升，信贷是否宽松
+3. 货币政策：降准降息预期、房贷利率走势
+4. 经济基本面：GDP增速、居民收入、消费信心
+
+【二、行业政策面（权重30%）— 最关键维度】
+1. 需求端政策：是否出现"放松限购"、"降低首付"、"降低利率"等宽松信号
+2. 供给端政策：是否有"保交楼"、"白名单"、"城中村改造"等托底政策
+3. 政策基调：是否出现"止跌企稳"、"政策宽松"、"促进消费"等积极措辞
+4. 地方落地：重点城市（北上广深、强二线）是否有实质性放松
+
+【三、个股基本面（权重30%）】
+1. 收入增长：营收是否同比增长或降幅收窄，结合行业趋势判断可持续性
+2. 减值计提：是否已充分计提存货减值、土地减值，未来业绩是否轻装上阵
+3. 三条红线：剔除预收后资产负债率<70%、净负债率<100%、现金短债比>1
+4. 财务质量：经营性现金流是否为正、回款率、有息负债规模
+
+【四、估值安全边际（权重15%）】
+1. PB估值：PB<1为核心条件，破净程度越深安全边际越高
+2. PE估值：PE_TTM是否合理，是否处于历史低位
+3. 股息率：是否有稳定分红，股息率是否具有吸引力
+
+请基于以上框架给出评分(0-100分)和详细分析。如果新闻中出现重大政策利好（放松限购、降息等），应显著上调评分。
+严格按照要求的JSON格式输出。"""
+
+
+def _calc_soochow_fundamental(fundamentals: Optional[dict]) -> Optional[float]:
+    """东吴模型基本面评分（100分制）
+    重点关注：三条红线(30分) + 估值安全边际(30分) + 盈利质量(20分) + 资金面(20分)
+    """
+    if not fundamentals:
+        return None
+
+    pb = fundamentals.get("pb_mrq")
+    pe = fundamentals.get("pe_ttm")
+    roe = fundamentals.get("roe")
+    eps = fundamentals.get("eps")
+    debt_ratio = fundamentals.get("debt_ratio")
+
+    if pb is None and pe is None:
+        return None
+
+    score = 0.0
+    max_score = 0.0
+
+    # ═══ 三条红线 & 财务健康（30分）═══
+
+    # 资产负债率 (0~15分) — 三道红线核心指标
+    if debt_ratio is not None:
+        max_score += 15
+        if debt_ratio < 70:
+            score += 15  # 绿档：完全达标
+        elif debt_ratio < 75:
+            score += 11
+        elif debt_ratio < 80:
+            score += 7
+        elif debt_ratio < 85:
+            score += 3
+        else:
+            score += 1  # 严重超标
+
+    # ROE盈利能力 (0~15分)
+    if roe is not None:
+        max_score += 15
+        if roe >= 15:
+            score += 15
+        elif roe >= 10:
+            score += 12
+        elif roe >= 5:
+            score += 9
+        elif roe >= 0:
+            score += 5
+        else:
+            score += 1  # 亏损
+
+    # ═══ 估值安全边际（30分）═══
+
+    # PB估值 (0~20分) — 东吴模型核心条件
+    if pb is not None:
+        max_score += 20
+        if pb < 0:
+            score += 2   # 净资产为负
+        elif pb < 0.3:
+            score += 15  # 深度破净但可能有风险
+        elif pb < 0.5:
+            score += 18  # 严重低估
+        elif pb < 0.8:
+            score += 20  # 破净，最优区间
+        elif pb < 1.0:
+            score += 16  # 接近破净
+        elif pb < 1.2:
+            score += 10
+        elif pb < 1.5:
+            score += 6
+        else:
+            score += 2   # 偏贵
+
+    # PE估值 (0~10分)
+    if pe is not None:
+        max_score += 10
+        if pe < 0:
+            score += 2   # 亏损
+        elif pe < 8:
+            score += 10  # 极低估值
+        elif pe <= 15:
+            score += 8
+        elif pe <= 25:
+            score += 5
+        elif pe <= 40:
+            score += 3
+        else:
+            score += 1
+
+    # ═══ 盈利质量（20分）═══
+
+    # EPS每股收益 (0~12分)
+    if eps is not None:
+        max_score += 12
+        if eps > 2.0:
+            score += 12
+        elif eps > 1.0:
+            score += 10
+        elif eps > 0.5:
+            score += 7
+        elif eps > 0.1:
+            score += 4
+        elif eps > 0:
+            score += 2
+        else:
+            score += 0  # 亏损
+
+    # 20日涨跌幅趋势 (0~8分)
+    chg_20d = fundamentals.get("chg_20d")
+    if chg_20d is not None:
+        max_score += 8
+        if 5 <= chg_20d <= 20:
+            score += 8
+        elif 0 < chg_20d < 5:
+            score += 6
+        elif 20 < chg_20d <= 40:
+            score += 5
+        elif -5 <= chg_20d <= 0:
+            score += 3
+        elif -15 <= chg_20d < -5:
+            score += 2
+        else:
+            score += 1
+
+    # ═══ 资金面（20分）═══
+
+    # 主力净流入 (0~12分)
+    mnf = fundamentals.get("main_net_inflow")
+    if mnf is not None:
+        max_score += 12
+        if mnf > 5000:
+            score += 12
+        elif mnf > 1000:
+            score += 10
+        elif mnf > 0:
+            score += 7
+        elif mnf > -1000:
+            score += 4
+        elif mnf > -5000:
+            score += 2
+        else:
+            score += 1
+
+    # 换手率 (0~8分)
+    tr = fundamentals.get("turnover_ratio")
+    if tr is not None:
+        max_score += 8
+        if 1.0 <= tr <= 5.0:
+            score += 8
+        elif 5.0 < tr <= 10.0:
+            score += 6
+        elif 0.5 <= tr < 1.0:
+            score += 4
+        elif tr > 10.0:
+            score += 3
+        else:
+            score += 2
+
+    if max_score == 0:
+        return None
+
+    normalized = score / max_score * 100
+    return _clamp(normalized)
+
+
+async def _get_soochow_ai_rating(name: str, code: str, market: str,
+                                  df: pd.DataFrame, fundamentals: Optional[dict]) -> Optional[dict]:
+    """东吴模型的AI评分 — 聚焦宏观政策+行业趋势+基本面验证"""
+    try:
+        news_summary = get_real_estate_news_summary(code, name)
+        announcements = fetch_recent_announcements(code, market) or ""
+
+        fund_info = ""
+        if fundamentals:
+            parts = []
+            if fundamentals.get("pe_ttm") is not None:
+                parts.append(f"PE(TTM)={fundamentals['pe_ttm']:.2f}")
+            if fundamentals.get("pb_mrq") is not None:
+                parts.append(f"PB(MRQ)={fundamentals['pb_mrq']:.4f}")
+            if fundamentals.get("roe") is not None:
+                parts.append(f"ROE={fundamentals['roe']:.2f}%")
+            if fundamentals.get("eps") is not None:
+                parts.append(f"EPS={fundamentals['eps']:.3f}")
+            if fundamentals.get("debt_ratio") is not None:
+                parts.append(f"资产负债率={fundamentals['debt_ratio']:.1f}%")
+            if fundamentals.get("market_value") is not None:
+                parts.append(f"总市值={fundamentals['market_value']:.1f}亿")
+            fund_info = "；".join(parts)
+
+        recent = df.tail(5)
+        price_info = f"最新收盘价{recent.iloc[-1]['close']:.2f}，5日涨跌幅{((recent.iloc[-1]['close']/recent.iloc[0]['close'])-1)*100:.2f}%"
+
+        user_msg = f"""请分析 {name}({code}) [{market}市场] 的投资价值。
+
+【最新行业资讯与政策】
+{news_summary}
+
+【iFinD公告】
+{announcements[:500] if announcements else '无近期公告'}
+
+【基本面数据】
+{fund_info or '暂无数据'}
+
+【近期行情】
+{price_info}
+
+请重点关注：
+1. 当前宏观利率环境和融资环境对房地产的影响
+2. 最新政策中是否有"放松限购"、"政策宽松"、"止跌企稳"等积极信号
+3. 该公司是否收入增长稳健、三条红线达标、减值计提充分
+4. PB是否<1，估值是否具有安全边际
+
+请给出你的评分(0-100分)和分析理由。
+请严格使用如下JSON格式回复:
+{{"score": 数字, "analysis": "你的详细分析"}}"""
+
+        raw = await chat_hunyuan(
+            user_msg,
+            system=SOOCHOW_AI_PROMPT,
+            temperature=0.3,
+            enable_search=True,
+        )
+        if not raw:
+            return None
+
+        cleaned = raw.strip()
+        json_match = re.search(r'\{[^{}]*"score"\s*:\s*(\d+(?:\.\d+)?)[^{}]*"analysis"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}', cleaned, re.DOTALL)
+        if not json_match:
+            json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', cleaned, re.DOTALL)
+            if json_match:
+                try:
+                    parsed = json.loads(json_match.group(1))
+                    return {
+                        "ai_score": _clamp(float(parsed.get("score", 50))),
+                        "analysis": parsed.get("analysis", ""),
+                    }
+                except (json.JSONDecodeError, ValueError):
+                    pass
+            return None
+
+        ai_score = _clamp(float(json_match.group(1)))
+        analysis = json_match.group(2).replace('\\"', '"').replace('\\n', '\n')
+        return {"ai_score": ai_score, "analysis": analysis}
+
+    except Exception as e:
+        logger.warning(f"东吴模型AI评分失败({name}): {e}")
+        return None
+
+
+async def rate_stock_soochow(df: pd.DataFrame, name: str = "", code: str = "",
+                              market: str = "") -> Optional[Dict]:
+    """东吴地产选股模型评级（基本面70% + AI30%）"""
+    if df is None or len(df) < 20:
+        return None
+
+    fundamentals = None
+    fundamental_score = None
+    try:
+        fundamentals = fetch_fundamentals(code, market, history_df=df)
+        if fundamentals:
+            fundamental_score = _calc_soochow_fundamental(fundamentals)
+            if fundamental_score is not None:
+                logger.info(f"  [东吴] 基本面评分: {fundamental_score:.1f} (PB={fundamentals.get('pb_mrq')}, 负债率={fundamentals.get('debt_ratio')})")
+    except Exception as e:
+        logger.warning(f"[东吴] 获取{name}基本面数据失败: {e}")
+
+    ai_result = await _get_soochow_ai_rating(name, code, market, df, fundamentals)
+
+    has_fund = fundamental_score is not None
+    if ai_result:
+        ai_score = ai_result["ai_score"]
+        if has_fund:
+            total = round(fundamental_score * SOOCHOW_FUND_RATIO + ai_score * SOOCHOW_AI_RATIO, 2)
+        else:
+            total = round(ai_score, 2)
+        reason = ai_result["analysis"]
+    else:
+        ai_score = 0.0
+        if has_fund:
+            total = round(fundamental_score * SOOCHOW_FUND_NO_AI, 2)
+        else:
+            return None
+        reason = ""
+
+    rating_label = "谨慎"
+    for threshold, label in RATING_MAP:
+        if total >= threshold:
+            rating_label = label
+            break
+
+    if not reason and fundamentals:
+        pb_str = f"PB={fundamentals.get('pb_mrq', 'N/A')}"
+        debt_str = f"负债率={fundamentals.get('debt_ratio', 'N/A')}%"
+        reason = f"东吴模型基本面评估：{pb_str}，{debt_str}，基本面评分{fundamental_score:.1f}分。"
+
+    quant_scores = calc_quant_score(df)
+
+    result = {
+        "trend_score": quant_scores["trend"],
+        "momentum_score": quant_scores["momentum"],
+        "volatility_score": quant_scores["volatility"],
+        "volume_score": quant_scores["volume"],
+        "value_score": quant_scores["value"],
+        "ai_score": round(ai_score, 2),
+        "total_score": total,
+        "rating": rating_label,
+        "reason": reason,
+    }
+
+    if fundamentals:
+        result["pe_ttm"] = fundamentals.get("pe_ttm")
+        result["pb_mrq"] = fundamentals.get("pb_mrq")
+        result["roe"] = fundamentals.get("roe")
+        result["eps"] = fundamentals.get("eps")
+        result["market_value"] = fundamentals.get("market_value")
+        result["debt_ratio"] = fundamentals.get("debt_ratio")
+        result["main_net_inflow"] = fundamentals.get("main_net_inflow")
+        result["retail_net_inflow"] = fundamentals.get("retail_net_inflow")
+        result["large_net_inflow"] = fundamentals.get("large_net_inflow")
+        result["rise_day_count"] = fundamentals.get("rise_day_count")
+        result["vol_ratio"] = fundamentals.get("vol_ratio")
+        result["swing"] = fundamentals.get("swing")
+        result["committee"] = fundamentals.get("committee")
+        result["turnover_ratio"] = fundamentals.get("turnover_ratio")
+        result["chg_5d"] = fundamentals.get("chg_5d")
+        result["chg_10d"] = fundamentals.get("chg_10d")
+        result["chg_20d"] = fundamentals.get("chg_20d")
+        result["chg_60d"] = fundamentals.get("chg_60d")
+        result["chg_120d"] = fundamentals.get("chg_120d")
+        result["chg_year"] = fundamentals.get("chg_year")
+    if fundamental_score is not None:
+        result["fundamental_score"] = round(fundamental_score, 2)
+
+    return result

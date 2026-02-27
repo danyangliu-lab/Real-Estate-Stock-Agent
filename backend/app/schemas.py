@@ -99,6 +99,7 @@ class RatingOut(BaseModel):
     name: str
     market: str
     date: date
+    model_type: str = "quant_ai"
     trend_score: float
     momentum_score: float
     volatility_score: float

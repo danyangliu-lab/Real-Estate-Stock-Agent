@@ -51,7 +51,7 @@ function formatMoney(val) {
   return `${val.toFixed(2)}万`
 }
 
-export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
+export default function DetailPanel({ rating, modelType, cachedAnnouncements, onClose }) {
   const [prices, setPrices] = useState([])
   const [ratingTrend, setRatingTrend] = useState([])
   const [history, setHistory] = useState([])
@@ -62,10 +62,11 @@ export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
   useEffect(() => {
     if (!rating) return
     setLoading(true)
+    const mt = modelType || rating.model_type || 'quant_ai'
     Promise.all([
       api.getPrices(rating.code, 60).catch(() => []),
-      api.getRatingTrend(rating.code, 60).catch(() => []),
-      api.getRatingHistory(rating.code, 60).catch(() => []),
+      api.getRatingTrend(rating.code, 60, mt).catch(() => []),
+      api.getRatingHistory(rating.code, 60, mt).catch(() => []),
     ]).then(([p, t, h]) => {
       setPrices(p)
       setRatingTrend(t)
@@ -83,7 +84,7 @@ export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
         .catch(() => setAnnouncements([]))
         .finally(() => setAnnLoading(false))
     }
-  }, [rating, cachedAnnouncements])
+  }, [rating, cachedAnnouncements, modelType])
 
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose()
@@ -92,6 +93,8 @@ export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
   }, [onClose])
 
   if (!rating) return null
+
+  const isSoochow = modelType === 'soochow' || rating.model_type === 'soochow'
 
   const quantScore = (
     rating.trend_score * 0.25 +
@@ -139,9 +142,13 @@ export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
             </div>
             {rating.ai_score > 0 && (
               <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
-                {rating.fundamental_score != null
-                  ? `量化 ${quantScore}×30% + 基本面 ${rating.fundamental_score.toFixed(1)}×20% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×50%`
-                  : `量化 ${quantScore}×38% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×62%`
+                {isSoochow
+                  ? (rating.fundamental_score != null
+                      ? `基本面 ${rating.fundamental_score.toFixed(1)}×70% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×30%`
+                      : `AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×100%`)
+                  : (rating.fundamental_score != null
+                      ? `量化 ${quantScore}×30% + 基本面 ${rating.fundamental_score.toFixed(1)}×20% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×50%`
+                      : `量化 ${quantScore}×38% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×62%`)
                 }
               </div>
             )}
@@ -320,20 +327,22 @@ export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
             </div>
           )}
 
-          {/* 维度评分 */}
-          <div className="detail-section">
-            <div className="detail-section-title">量化维度评分</div>
-            <div className="scores-grid">
-              {scores.map(s => (
-                <div className="score-item" key={s.key}>
-                  <div className="score-item-label">{s.label}</div>
-                  <div className="score-item-value" style={{ color: getScoreColor(s.value) }}>
-                    {typeof s.value === 'number' ? s.value.toFixed(2) : s.value}
+          {/* 维度评分 - 量化AI模型专属 */}
+          {!isSoochow && (
+            <div className="detail-section">
+              <div className="detail-section-title">量化维度评分</div>
+              <div className="scores-grid">
+                {scores.map(s => (
+                  <div className="score-item" key={s.key}>
+                    <div className="score-item-label">{s.label}</div>
+                    <div className="score-item-value" style={{ color: getScoreColor(s.value) }}>
+                      {typeof s.value === 'number' ? s.value.toFixed(2) : s.value}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 评级理由 / AI分析 */}
           <div className="detail-section">
@@ -351,28 +360,52 @@ export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
                 </div>
                 <div className="ai-analysis-content">{rating.reason}</div>
                 <div className="score-composition">
-                  <span className="score-comp-part">
-                    <span className="score-comp-dot" style={{ background: 'var(--accent)' }} />
-                    量化({quantScore}) ×{rating.fundamental_score != null ? '30%' : '38%'}
-                  </span>
-                  {rating.fundamental_score != null && (
+                  {isSoochow ? (
                     <>
+                      {rating.fundamental_score != null && (
+                        <>
+                          <span className="score-comp-part">
+                            <span className="score-comp-dot" style={{ background: 'var(--green)' }} />
+                            基本面({rating.fundamental_score.toFixed(1)}) ×70%
+                          </span>
+                          <span style={{ color: 'var(--text-muted)' }}>+</span>
+                        </>
+                      )}
+                      <span className="score-comp-part">
+                        <span className="score-comp-dot" style={{ background: 'var(--purple)' }} />
+                        AI({typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}) ×{rating.fundamental_score != null ? '30%' : '100%'}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>=</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                        综合 {typeof rating.total_score === 'number' ? rating.total_score.toFixed(2) : rating.total_score}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="score-comp-part">
+                        <span className="score-comp-dot" style={{ background: 'var(--accent)' }} />
+                        量化({quantScore}) ×{rating.fundamental_score != null ? '30%' : '38%'}
+                      </span>
+                      {rating.fundamental_score != null && (
+                        <>
+                          <span style={{ color: 'var(--text-muted)' }}>+</span>
+                          <span className="score-comp-part">
+                            <span className="score-comp-dot" style={{ background: 'var(--green)' }} />
+                            基本面({rating.fundamental_score.toFixed(1)}) ×20%
+                          </span>
+                        </>
+                      )}
                       <span style={{ color: 'var(--text-muted)' }}>+</span>
                       <span className="score-comp-part">
-                        <span className="score-comp-dot" style={{ background: 'var(--green)' }} />
-                        基本面({rating.fundamental_score.toFixed(1)}) ×20%
+                        <span className="score-comp-dot" style={{ background: 'var(--purple)' }} />
+                        AI({typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}) ×{rating.fundamental_score != null ? '50%' : '62%'}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>=</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                        综合 {typeof rating.total_score === 'number' ? rating.total_score.toFixed(2) : rating.total_score}
                       </span>
                     </>
                   )}
-                  <span style={{ color: 'var(--text-muted)' }}>+</span>
-                  <span className="score-comp-part">
-                    <span className="score-comp-dot" style={{ background: 'var(--purple)' }} />
-                    AI({typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}) ×{rating.fundamental_score != null ? '50%' : '62%'}
-                  </span>
-                  <span style={{ color: 'var(--text-muted)' }}>=</span>
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                    综合 {typeof rating.total_score === 'number' ? rating.total_score.toFixed(2) : rating.total_score}
-                  </span>
                 </div>
               </div>
             ) : (

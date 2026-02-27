@@ -18,7 +18,7 @@ class Base(DeclarativeBase):
 
 
 async def _migrate_ratings_table(conn):
-    """为ratings表添加iFinD基本面字段（SQLite不支持批量ALTER，逐列添加）"""
+    """为ratings表添加新字段（SQLite不支持批量ALTER，逐列添加）"""
     new_columns = [
         ("pe_ttm", "FLOAT"),
         ("pb_mrq", "FLOAT"),
@@ -41,6 +41,7 @@ async def _migrate_ratings_table(conn):
         ("chg_60d", "FLOAT"),
         ("chg_120d", "FLOAT"),
         ("chg_year", "FLOAT"),
+        ("model_type", "VARCHAR(20) DEFAULT 'quant_ai'"),
     ]
     for col_name, col_type in new_columns:
         try:
@@ -48,6 +49,18 @@ async def _migrate_ratings_table(conn):
             logger.info(f"Added column ratings.{col_name}")
         except Exception:
             pass  # 列已存在，忽略
+
+    # 为已有数据补填 model_type
+    try:
+        await conn.execute(text("UPDATE ratings SET model_type = 'quant_ai' WHERE model_type IS NULL"))
+    except Exception:
+        pass
+
+    # 创建新索引（忽略已存在）
+    try:
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_rating_code_date_model ON ratings (code, date, model_type)"))
+    except Exception:
+        pass
 
 
 async def init_db():

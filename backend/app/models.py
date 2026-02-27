@@ -82,13 +82,14 @@ class StockPrice(Base):
 
 class Rating(Base):
     __tablename__ = "ratings"
-    __table_args__ = (Index("ix_rating_code_date", "code", "date"),)
+    __table_args__ = (Index("ix_rating_code_date_model", "code", "date", "model_type"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     code = Column(String(20), nullable=False)
     name = Column(String(100), nullable=False)
     market = Column(String(10), nullable=False)
     date = Column(Date, nullable=False)
+    model_type = Column(String(20), nullable=False, default="quant_ai")  # quant_ai / soochow
     # 评分维度 (0-100)
     trend_score = Column(Float, default=0)
     momentum_score = Column(Float, default=0)

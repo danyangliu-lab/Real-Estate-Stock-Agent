@@ -194,6 +194,42 @@ body {
   margin-top: 4px;
 }
 
+/* 模型切换 */
+.model-switcher {
+  display: flex;
+  gap: 0;
+  margin-bottom: 16px;
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 4px;
+  box-shadow: var(--shadow);
+  width: fit-content;
+}
+
+.model-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.model-btn:hover {
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+.model-btn.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+}
+
 /* 筛选栏 */
 .filters {
   display: flex;

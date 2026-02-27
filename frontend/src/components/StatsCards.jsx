@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { api } from '../api'
 
-export default function StatsCards({ dashboard }) {
+export default function StatsCards({ dashboard, modelType }) {
   const [showStockList, setShowStockList] = useState(false)
   const [showRatedList, setShowRatedList] = useState(false)
   const [stockList, setStockList] = useState([])
@@ -15,11 +15,11 @@ export default function StatsCards({ dashboard }) {
 
   useEffect(() => {
     if (showRatedList && ratedList.length === 0) {
-      api.getLatestRatings({ sort_by: 'total_score', sort_dir: 'desc' })
+      api.getLatestRatings({ sort_by: 'total_score', sort_dir: 'desc', model_type: modelType })
         .then(setRatedList)
         .catch(() => {})
     }
-  }, [showRatedList, ratedList.length])
+  }, [showRatedList, ratedList.length, modelType])
 
   if (!dashboard) return null
 

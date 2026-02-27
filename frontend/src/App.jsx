@@ -33,12 +33,18 @@ const RATING_FILTERS = [
 
 const AUTO_REFRESH_INTERVAL = 30000
 
+const MODEL_OPTIONS = [
+  { value: 'quant_ai', label: '量化AI选股' },
+  { value: 'soochow', label: '东吴地产选股' },
+]
+
 export default function App() {
   const [user, setUser] = useState(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [activeTab, setActiveTab] = useState('rating')
 
   // 评级页状态
+  const [modelType, setModelType] = useState('quant_ai')
   const [dashboard, setDashboard] = useState(null)
   const [ratings, setRatings] = useState([])
   const [loading, setLoading] = useState(true)
@@ -75,21 +81,22 @@ export default function App() {
     if (!silent) setLoading(true)
     try {
       const [dash, avDates] = await Promise.all([
-        api.getDashboard(),
-        api.getAvailableDates(),
+        api.getDashboard(modelType),
+        api.getAvailableDates(modelType),
       ])
       setDashboard(dash)
       setDates(avDates)
 
       let data
       if (selectedDate) {
-        data = await api.getRatingsByDate(selectedDate, marketFilter || undefined)
+        data = await api.getRatingsByDate(selectedDate, marketFilter || undefined, modelType)
       } else {
         data = await api.getLatestRatings({
           market: marketFilter || undefined,
           rating: ratingFilter || undefined,
           sort_by: sortBy,
           sort_dir: sortDir,
+          model_type: modelType,
         })
       }
       setRatings(data)
@@ -97,7 +104,7 @@ export default function App() {
       console.error('加载数据失败:', err)
     }
     if (!silent) setLoading(false)
-  }, [marketFilter, ratingFilter, sortBy, sortDir, selectedDate])
+  }, [marketFilter, ratingFilter, sortBy, sortDir, selectedDate, modelType])
 
   useEffect(() => {
     if (user && activeTab === 'rating') loadData()
@@ -186,9 +193,22 @@ export default function App() {
       <main className="container" style={{ paddingBottom: 40 }}>
         {activeTab === 'rating' && (
           <>
-            <StatsCards dashboard={dashboard} />
+            {/* 模型切换 */}
+            <div className="model-switcher">
+              {MODEL_OPTIONS.map(m => (
+                <button
+                  key={m.value}
+                  className={`model-btn ${modelType === m.value ? 'active' : ''}`}
+                  onClick={() => { setModelType(m.value); setSelectedDate('') }}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+
+            <StatsCards dashboard={dashboard} modelType={modelType} />
             <NewsSection />
-            <RatingMethodology />
+            <RatingMethodology modelType={modelType} />
 
             <div className="filters">
               {MARKET_FILTERS.map(f => (
@@ -281,6 +301,7 @@ export default function App() {
       {selectedStock && (
         <DetailPanel
           rating={selectedStock}
+          modelType={modelType}
           cachedAnnouncements={annCache[selectedStock.code]}
           onClose={() => setSelectedStock(null)}
         />
