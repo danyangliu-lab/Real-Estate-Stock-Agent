@@ -16,7 +16,7 @@ from sqlalchemy import select, func
 from app.api import router
 from app.config import ADMIN_USERNAME, ADMIN_PASSWORD, UPLOAD_DIR
 from app.database import init_db, async_session
-from app.models import Rating, User
+from app.models import Rating, Stock, User
 from app.auth import hash_password
 from app.scheduler import init_stock_list, refresh_all_data
 from app.news_fetcher import preload_news_cache
@@ -57,16 +57,34 @@ async def init_admin():
 
 
 async def check_and_refresh():
-    """检查今日是否已有评级数据，没有则自动执行刷新"""
-    async with async_session() as session:
-        latest_date = await session.scalar(select(func.max(Rating.date)))
-
+    """检查今日两个模型是否都有足够的评级数据，不足则自动刷新"""
     today = date.today()
-    if latest_date is None or latest_date < today:
-        logger.info("今日尚无评级数据，启动自动刷新...")
+    async with async_session() as session:
+        # 分别检查两个模型今日的评级数量
+        quant_count = await session.scalar(
+            select(func.count(Rating.id)).where(
+                Rating.date == today, Rating.model_type == "quant_ai"
+            )
+        )
+        soochow_count = await session.scalar(
+            select(func.count(Rating.id)).where(
+                Rating.date == today, Rating.model_type == "soochow"
+            )
+        )
+        # 检查活跃股票总数
+        stock_count = await session.scalar(
+            select(func.count(Stock.id)).where(Stock.is_active == 1)
+        )
+
+    logger.info(f"今日评级检查: quant_ai={quant_count}, soochow={soochow_count}, 活跃股票={stock_count}")
+
+    # 任一模型评级数量不足活跃股票数的80%，就触发全量刷新
+    threshold = int(stock_count * 0.8) if stock_count else 0
+    if quant_count < threshold or soochow_count < threshold:
+        logger.info(f"评级数据不完整(阈值={threshold})，启动自动刷新...")
         await refresh_all_data()
     else:
-        logger.info(f"今日({today})评级数据已存在，跳过刷新")
+        logger.info(f"今日({today})双模型评级数据已完整，跳过刷新")
 
 
 @asynccontextmanager
