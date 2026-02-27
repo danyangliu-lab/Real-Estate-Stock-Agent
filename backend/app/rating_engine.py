@@ -1102,7 +1102,7 @@ async def rate_stock(df: pd.DataFrame, name: str = "", code: str = "", market: s
     fundamentals = None
     fundamental_score = None
     try:
-        fundamentals = fetch_fundamentals(code, market)
+        fundamentals = fetch_fundamentals(code, market, history_df=df)
         if fundamentals:
             fundamental_score = calc_fundamental_score(fundamentals)
             if fundamental_score is not None:

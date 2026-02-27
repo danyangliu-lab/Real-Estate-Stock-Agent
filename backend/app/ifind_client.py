@@ -492,9 +492,97 @@ def fetch_financials(codes: List[str], market: str) -> Optional[Dict[str, dict]]
 # 批量获取所有基本面数据（合并调用）
 # =====================================================================
 
-def fetch_fundamentals(code: str, market: str) -> Optional[dict]:
+def _is_valid_turnover_ratio(val) -> bool:
+    """校验换手率值是否合理（0~100%）"""
+    if val is None:
+        return False
+    try:
+        v = float(val)
+        return 0 <= v <= 100
+    except (ValueError, TypeError):
+        return False
+
+
+def _calc_rise_day_count(history_df) -> Optional[int]:
+    """根据历史行情计算连涨/连跌天数
+    返回正数=连涨天数，负数=连跌天数，0=平盘
+    """
+    if history_df is None or history_df.empty or len(history_df) < 2:
+        return None
+    try:
+        changes = history_df["change_pct"].values
+        # 从最后一天往前数
+        count = 0
+        last_dir = None  # True=涨, False=跌
+        for i in range(len(changes) - 1, -1, -1):
+            chg = changes[i]
+            if chg > 0:
+                direction = True
+            elif chg < 0:
+                direction = False
+            else:
+                break  # 平盘中断连续
+            if last_dir is None:
+                last_dir = direction
+                count = 1
+            elif direction == last_dir:
+                count += 1
+            else:
+                break
+        if last_dir is None:
+            return 0
+        return count if last_dir else -count
+    except Exception:
+        return None
+
+
+def _calc_period_changes(history_df) -> dict:
+    """根据历史行情计算多周期涨跌幅
+    返回: {chg_5d, chg_10d, chg_20d, chg_60d, chg_120d, chg_year}
+    """
+    result = {}
+    if history_df is None or history_df.empty or len(history_df) < 2:
+        return result
+    try:
+        closes = history_df["close"].values
+        dates = history_df["date"].values
+        n = len(closes)
+        latest = closes[-1]
+
+        for label, days in [("chg_5d", 5), ("chg_10d", 10), ("chg_20d", 20),
+                            ("chg_60d", 60), ("chg_120d", 120)]:
+            idx = max(0, n - days - 1)
+            if idx < n - 1 and closes[idx] and closes[idx] > 0:
+                result[label] = round((latest / closes[idx] - 1) * 100, 2)
+
+        # 年初至今涨跌幅
+        try:
+            current_year = datetime.now().year
+            year_start_idx = None
+            for i in range(n):
+                d = dates[i]
+                # 兼容 date 和 datetime 对象
+                yr = d.year if hasattr(d, 'year') else int(str(d)[:4])
+                if yr >= current_year:
+                    year_start_idx = i
+                    break
+            if year_start_idx is not None and closes[year_start_idx] and closes[year_start_idx] > 0:
+                result["chg_year"] = round((latest / closes[year_start_idx] - 1) * 100, 2)
+        except Exception:
+            pass
+
+    except Exception:
+        pass
+    return result
+
+
+def fetch_fundamentals(code: str, market: str, history_df=None) -> Optional[dict]:
     """获取单只股票的全部基本面数据
     合并估值+财务指标+实时资金流
+    Args:
+        code: 股票代码
+        market: 市场 (A/HK/US)
+        history_df: 可选的历史行情DataFrame，用于计算港股缺失的连涨天数和多周期涨跌幅
     """
     result = {}
 
@@ -531,9 +619,13 @@ def fetch_fundamentals(code: str, market: str) -> Optional[dict]:
             # 委比
             if rt_data.get("committee") is not None:
                 result["committee"] = round(rt_data["committee"], 2)
-            # 换手率（从realtime补充）
-            if rt_data.get("turnover_ratio") is not None and not result.get("turnover_ratio"):
-                result["turnover_ratio"] = round(rt_data["turnover_ratio"], 2)
+            # 换手率（从realtime补充，带合理性校验）
+            if not result.get("turnover_ratio"):
+                raw_tr = rt_data.get("turnover_ratio")
+                if _is_valid_turnover_ratio(raw_tr):
+                    result["turnover_ratio"] = round(raw_tr, 2)
+                elif raw_tr is not None:
+                    logger.warning(f"换手率异常值已过滤: {code} turnover_ratio={raw_tr}")
             # 多周期涨跌幅（从实时接口获取比手动计算更准确）
             for key in ["chg_5d", "chg_10d", "chg_20d", "chg_60d", "chg_120d", "chg_year"]:
                 if rt_data.get(key) is not None:
@@ -547,6 +639,24 @@ def fetch_fundamentals(code: str, market: str) -> Optional[dict]:
                 result["market_value"] = round(rt_data["total_capital"] / 1e8, 2)
     except Exception as e:
         logger.debug(f"实时增强数据获取失败（非关键）: {e}")
+
+    # 对换手率做最终合理性校验（防止 basic_data_service 也返回异常值）
+    if result.get("turnover_ratio") is not None and not _is_valid_turnover_ratio(result["turnover_ratio"]):
+        logger.warning(f"最终换手率异常值已过滤: {code} turnover_ratio={result['turnover_ratio']}")
+        result["turnover_ratio"] = None
+
+    # 用历史行情补充缺失的数据（港股等iFinD返回null的指标）
+    if history_df is not None and not history_df.empty:
+        # 补充连涨天数
+        if result.get("rise_day_count") is None:
+            calc_rdc = _calc_rise_day_count(history_df)
+            if calc_rdc is not None:
+                result["rise_day_count"] = calc_rdc
+        # 补充多周期涨跌幅
+        calc_chg = _calc_period_changes(history_df)
+        for key in ["chg_5d", "chg_10d", "chg_20d", "chg_60d", "chg_120d", "chg_year"]:
+            if result.get(key) is None and key in calc_chg:
+                result[key] = calc_chg[key]
 
     return result if result else None
 
