@@ -140,8 +140,8 @@ export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
             {rating.ai_score > 0 && (
               <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
                 {rating.fundamental_score != null
-                  ? `量化 ${quantScore}×30% + 基本面 ${rating.fundamental_score.toFixed(1)}×30% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×40%`
-                  : `量化 ${quantScore}×40% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×60%`
+                  ? `量化 ${quantScore}×30% + 基本面 ${rating.fundamental_score.toFixed(1)}×20% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×50%`
+                  : `量化 ${quantScore}×38% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×62%`
                 }
               </div>
             )}
@@ -353,21 +353,21 @@ export default function DetailPanel({ rating, cachedAnnouncements, onClose }) {
                 <div className="score-composition">
                   <span className="score-comp-part">
                     <span className="score-comp-dot" style={{ background: 'var(--accent)' }} />
-                    量化({quantScore}) ×{rating.fundamental_score != null ? '30%' : '40%'}
+                    量化({quantScore}) ×{rating.fundamental_score != null ? '30%' : '38%'}
                   </span>
                   {rating.fundamental_score != null && (
                     <>
                       <span style={{ color: 'var(--text-muted)' }}>+</span>
                       <span className="score-comp-part">
                         <span className="score-comp-dot" style={{ background: 'var(--green)' }} />
-                        基本面({rating.fundamental_score.toFixed(1)}) ×30%
+                        基本面({rating.fundamental_score.toFixed(1)}) ×20%
                       </span>
                     </>
                   )}
                   <span style={{ color: 'var(--text-muted)' }}>+</span>
                   <span className="score-comp-part">
                     <span className="score-comp-dot" style={{ background: 'var(--purple)' }} />
-                    AI({typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}) ×{rating.fundamental_score != null ? '40%' : '60%'}
+                    AI({typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}) ×{rating.fundamental_score != null ? '50%' : '62%'}
                   </span>
                   <span style={{ color: 'var(--text-muted)' }}>=</span>
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>

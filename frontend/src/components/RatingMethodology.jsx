@@ -25,11 +25,11 @@ export default function RatingMethodology() {
             <span className="formula-eq">=</span>
             <span className="formula-part quant">量化技术 × 30%</span>
             <span className="formula-plus">+</span>
-            <span className="formula-part" style={{color:'var(--green)'}}>基本面 × 30%</span>
+            <span className="formula-part" style={{color:'var(--green)'}}>基本面 × 20%</span>
             <span className="formula-plus">+</span>
-            <span className="formula-part ai">AI大模型 × 40%</span>
+            <span className="formula-part ai">AI大模型 × 50%</span>
           </div>
-          <div className="methodology-fallback">基本面数据来自同花顺iFinD（含估值+资金流+市场情绪三维度）；若基本面不可用则量化40%+AI60%；若AI不可用则量化50%+基本面50%</div>
+          <div className="methodology-fallback">基本面数据来自同花顺iFinD（含估值+资金流+市场情绪三维度）；若基本面不可用则量化38%+AI62%；若AI不可用则量化60%+基本面40%</div>
 
           <div className="methodology-columns">
             {/* 左列: 量化 */}
@@ -74,7 +74,7 @@ export default function RatingMethodology() {
             <div className="methodology-col">
               <div className="methodology-col-title">
                 <span className="col-dot" style={{background:'var(--green)'}} />
-                基本面评分 (30%)
+                基本面评分 (20%)
                 <span className="ifind-badge-sm">iFinD</span>
               </div>
               <div className="methodology-col-desc">
@@ -113,7 +113,7 @@ export default function RatingMethodology() {
             <div className="methodology-col">
               <div className="methodology-col-title">
                 <span className="col-dot ai-dot" />
-                AI大模型评分 (40%)
+                AI大模型评分 (50%)
               </div>
               <div className="methodology-col-desc">
                 由腾讯混元2.0大模型结合iFinD数据+实时联网搜索进行专业分析
