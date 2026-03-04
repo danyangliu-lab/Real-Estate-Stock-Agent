@@ -1861,7 +1861,7 @@ def _parse_soochow_ai_response(raw: str) -> Optional[Dict]:
 
 async def _get_soochow_ai_rating(name: str, code: str, market: str,
                                   df: pd.DataFrame, fundamentals: Optional[dict]) -> Optional[dict]:
-    """东吴模型的AI评分（混元 + DeepSeek 双模型融合）— 聚焦宏观政策+行业趋势+基本面验证"""
+    """东吴模型的AI评分（三模型融合）— 聚焦宏观政策+行业趋势+基本面验证"""
     try:
         news_summary = get_real_estate_news_summary(code, name)
         announcements = fetch_recent_announcements(code, market) or ""
@@ -1948,7 +1948,7 @@ async def _get_soochow_ai_rating(name: str, code: str, market: str,
 
 async def rate_stock_soochow(df: pd.DataFrame, name: str = "", code: str = "",
                               market: str = "") -> Optional[Dict]:
-    """东吴地产选股模型评级（基本面70% + AI30%）"""
+    """东吴地产选股模型评级（基本面50% + AI50%）"""
     if df is None or len(df) < 20:
         return None
 

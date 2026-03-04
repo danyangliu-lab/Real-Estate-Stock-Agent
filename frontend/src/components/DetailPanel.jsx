@@ -144,11 +144,11 @@ export default function DetailPanel({ rating, modelType, cachedAnnouncements, on
               <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75 }}>
                 {isSoochow
                   ? (rating.fundamental_score != null
-                      ? `基本面 ${rating.fundamental_score.toFixed(1)}×70% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×30%`
+                      ? `基本面 ${rating.fundamental_score.toFixed(1)}×50% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×50%`
                       : `AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×100%`)
                   : (rating.fundamental_score != null
-                      ? `量化 ${quantScore}×30% + 基本面 ${rating.fundamental_score.toFixed(1)}×20% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×50%`
-                      : `量化 ${quantScore}×38% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×62%`)
+                      ? `量化 ${quantScore}×25% + 情绪×10% + 基本面 ${rating.fundamental_score.toFixed(1)}×15% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×50%`
+                      : `量化 ${quantScore}×30% + 情绪×12% + AI ${typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}×58%`)
                 }
               </div>
             )}
@@ -354,7 +354,7 @@ export default function DetailPanel({ rating, modelType, cachedAnnouncements, on
               <div className="ai-analysis-card">
                 <div className="ai-analysis-header">
                   <span className="ai-analysis-badge">
-                    <span>&#x1F916;</span> 腾讯混元2.0
+                    <span>&#x1F916;</span> 三模型AI融合
                   </span>
                   <span className="ai-analysis-model">AI评分: {typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}分</span>
                 </div>
@@ -366,14 +366,14 @@ export default function DetailPanel({ rating, modelType, cachedAnnouncements, on
                         <>
                           <span className="score-comp-part">
                             <span className="score-comp-dot" style={{ background: 'var(--green)' }} />
-                            基本面({rating.fundamental_score.toFixed(1)}) ×70%
+                            基本面({rating.fundamental_score.toFixed(1)}) ×50%
                           </span>
                           <span style={{ color: 'var(--text-muted)' }}>+</span>
                         </>
                       )}
                       <span className="score-comp-part">
                         <span className="score-comp-dot" style={{ background: 'var(--purple)' }} />
-                        AI({typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}) ×{rating.fundamental_score != null ? '30%' : '100%'}
+                        AI({typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}) ×{rating.fundamental_score != null ? '50%' : '100%'}
                       </span>
                       <span style={{ color: 'var(--text-muted)' }}>=</span>
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -384,21 +384,26 @@ export default function DetailPanel({ rating, modelType, cachedAnnouncements, on
                     <>
                       <span className="score-comp-part">
                         <span className="score-comp-dot" style={{ background: 'var(--accent)' }} />
-                        量化({quantScore}) ×{rating.fundamental_score != null ? '30%' : '38%'}
+                        量化({quantScore}) ×{rating.fundamental_score != null ? '25%' : '30%'}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>+</span>
+                      <span className="score-comp-part">
+                        <span className="score-comp-dot" style={{ background: '#e67e22' }} />
+                        情绪 ×{rating.fundamental_score != null ? '10%' : '12%'}
                       </span>
                       {rating.fundamental_score != null && (
                         <>
                           <span style={{ color: 'var(--text-muted)' }}>+</span>
                           <span className="score-comp-part">
                             <span className="score-comp-dot" style={{ background: 'var(--green)' }} />
-                            基本面({rating.fundamental_score.toFixed(1)}) ×20%
+                            基本面({rating.fundamental_score.toFixed(1)}) ×15%
                           </span>
                         </>
                       )}
                       <span style={{ color: 'var(--text-muted)' }}>+</span>
                       <span className="score-comp-part">
                         <span className="score-comp-dot" style={{ background: 'var(--purple)' }} />
-                        AI({typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}) ×{rating.fundamental_score != null ? '50%' : '62%'}
+                        AI({typeof rating.ai_score === 'number' ? rating.ai_score.toFixed(2) : rating.ai_score}) ×{rating.fundamental_score != null ? '50%' : '58%'}
                       </span>
                       <span style={{ color: 'var(--text-muted)' }}>=</span>
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
@@ -548,7 +553,7 @@ export default function DetailPanel({ rating, modelType, cachedAnnouncements, on
 
           {/* 数据来源 */}
           <div className="detail-data-source">
-            数据来源：同花顺iFinD · 东方财富 · 腾讯混元AI · 中国政府网
+            数据来源：同花顺iFinD · 东方财富 · 腾讯云三模型AI · 中国政府网
           </div>
         </div>
       </div>

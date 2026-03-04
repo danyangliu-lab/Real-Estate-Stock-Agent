@@ -13,7 +13,7 @@ export default function RatingMethodology({ modelType }) {
         <div className="methodology-title-row">
           <span className="methodology-icon">&#x1f4d0;</span>
           <span className="methodology-title">{isSoochow ? '东吴地产选股逻辑说明' : '评级逻辑说明'}</span>
-          <span className="methodology-powered">Powered by 同花顺iFinD · 腾讯混元AI</span>
+          <span className="methodology-powered">Powered by 同花顺iFinD · 腾讯云三模型AI</span>
         </div>
         <span className={`methodology-arrow ${expanded ? 'expanded' : ''}`}>&#x25B6;</span>
       </div>
@@ -34,30 +34,33 @@ function QuantAIMethodology() {
       <div className="methodology-formula">
         <span className="formula-label">综合评分</span>
         <span className="formula-eq">=</span>
-        <span className="formula-part quant">量化技术 × 30%</span>
+        <span className="formula-part quant">量化技术 × 25%</span>
         <span className="formula-plus">+</span>
-        <span className="formula-part" style={{color:'var(--green)'}}>基本面 × 20%</span>
+        <span className="formula-part" style={{color:'#e67e22'}}>情绪因子 × 10%</span>
+        <span className="formula-plus">+</span>
+        <span className="formula-part" style={{color:'var(--green)'}}>基本面 × 15%</span>
         <span className="formula-plus">+</span>
         <span className="formula-part ai">AI大模型 × 50%</span>
       </div>
-      <div className="methodology-fallback">基本面数据来自同花顺iFinD（含估值+资金流+市场情绪三维度）；若基本面不可用则量化38%+AI62%；若AI不可用则量化60%+基本面40%</div>
+      <div className="methodology-fallback">AI采用DeepSeek V3.2+GLM-5+Kimi K2.5三模型融合；情绪因子基于关键词+双速衰减+AI反馈；若基本面不可用则量化30%+情绪12%+AI58%</div>
 
       <div className="methodology-columns">
         {/* 左列: 量化 */}
         <div className="methodology-col">
           <div className="methodology-col-title">
             <span className="col-dot quant-dot" />
-            量化技术评分 (30%)
+            量化技术评分 (25%)
           </div>
           <div className="methodology-col-desc">
-            基于iFinD实时行情数据，5个量化维度综合评估
+            基于iFinD实时行情数据，6个量化维度综合评估，AI动态调整各维度权重
           </div>
           <div className="dimension-list">
-            <DimensionItem name="趋势评分" weight="25%" desc="四级均线排列(MA5/10/20/60)、价格偏离度、MA20斜率、均线黏合度、ADX趋势强度" />
-            <DimensionItem name="动量评分" weight="20%" desc="RSI双周期(6+14)、MACD信号+柱状体变化、KDJ随机指标、Williams %R、多周期涨跌幅" />
-            <DimensionItem name="波动率评分" weight="15%" desc="年化波动率、布林带宽度+价格位置、ATR(14)相对波动、波动率收敛/发散趋势" />
-            <DimensionItem name="成交量评分" weight="20%" desc="多级量比(5/10/20日)、OBV能量潮、VWAP偏离度、量价配合度、成交量趋势" />
-            <DimensionItem name="价值评分" weight="20%" desc="区间位置连续评分、筹码集中度、多级支撑压力(10/20/60日)、价格动态区间" />
+            <DimensionItem name="趋势评分" weight="22%" desc="四级均线排列(MA5/10/20/60)、价格偏离度、MA20斜率、均线黏合度、ADX趋势强度" />
+            <DimensionItem name="动量评分" weight="18%" desc="RSI双周期(6+14)、MACD信号+柱状体变化、KDJ随机指标、Williams %R、多周期涨跌幅" />
+            <DimensionItem name="波动率评分" weight="12%" desc="年化波动率、布林带宽度+价格位置、ATR(14)相对波动、波动率收敛/发散趋势" />
+            <DimensionItem name="成交量评分" weight="18%" desc="多级量比(5/10/20日)、OBV能量潮、VWAP偏离度、量价配合度、成交量趋势" />
+            <DimensionItem name="价值评分" weight="18%" desc="区间位置连续评分、筹码集中度、多级支撑压力(10/20/60日)、价格动态区间" />
+            <DimensionItem name="情绪评分" weight="12%" desc="30正面+25负面房地产关键词、双速衰减模型(新闻3天/公告7天)、AI情绪反馈融合" />
           </div>
         </div>
 
@@ -65,7 +68,7 @@ function QuantAIMethodology() {
         <div className="methodology-col">
           <div className="methodology-col-title">
             <span className="col-dot" style={{background:'var(--green)'}} />
-            基本面评分 (20%)
+            基本面评分 (15%)
             <span className="ifind-badge-sm">iFinD</span>
           </div>
           <div className="methodology-col-desc">
@@ -87,7 +90,7 @@ function QuantAIMethodology() {
             AI大模型评分 (50%)
           </div>
           <div className="methodology-col-desc">
-            由腾讯混元2.0大模型结合iFinD数据+实时联网搜索进行专业分析
+            由DeepSeek V3.2+GLM-5+Kimi K2.5三模型融合，结合iFinD数据+实时联网搜索进行专业分析
           </div>
           <div className="dimension-list">
             <DimensionItem name="政策资讯影响" weight="35%" desc="最新房地产政策、调控文件、行业新闻、iFinD公告，实时联网获取" />
@@ -119,9 +122,9 @@ function SoochowMethodology() {
       <div className="methodology-formula">
         <span className="formula-label">综合评分</span>
         <span className="formula-eq">=</span>
-        <span className="formula-part" style={{color:'var(--green)'}}>基本面 × 70%</span>
+        <span className="formula-part" style={{color:'var(--green)'}}>基本面 × 50%</span>
         <span className="formula-plus">+</span>
-        <span className="formula-part ai">AI大模型 × 30%</span>
+        <span className="formula-part ai">AI大模型 × 50%</span>
       </div>
       <div className="methodology-fallback">聚焦房地产行业基本面研究，重点关注宏观LPR利率、行业政策信号、个股财务三道红线、PB&lt;1估值安全边际</div>
 
@@ -130,7 +133,7 @@ function SoochowMethodology() {
         <div className="methodology-col">
           <div className="methodology-col-title">
             <span className="col-dot" style={{background:'var(--green)'}} />
-            基本面评分 (70%)
+            基本面评分 (50%)
             <span className="ifind-badge-sm">iFinD</span>
           </div>
           <div className="methodology-col-desc">
@@ -148,10 +151,10 @@ function SoochowMethodology() {
         <div className="methodology-col">
           <div className="methodology-col-title">
             <span className="col-dot ai-dot" />
-            AI大模型评分 (30%)
+            AI大模型评分 (50%)
           </div>
           <div className="methodology-col-desc">
-            由腾讯混元2.0大模型结合iFinD数据+实时联网搜索，聚焦地产行业深度分析
+            由DeepSeek V3.2+GLM-5+Kimi K2.5三模型融合，结合iFinD数据+实时联网搜索，聚焦地产行业深度分析
           </div>
           <div className="dimension-list">
             <DimensionItem name="宏观政策" weight="30%" desc="LPR利率走势·房地产调控政策·货币/财政政策方向·城镇化/户籍改革" />
