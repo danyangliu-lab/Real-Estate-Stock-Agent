@@ -22,3 +22,4 @@ test_hk.py
 screenshot_*.png
 /*.pdf
 /*.docx
+report_pictures/
