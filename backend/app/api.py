@@ -132,7 +132,11 @@ async def get_dashboard(
             total_stocks=total or 0, rated_today=0, avg_score=0,
             market_distribution={}, rating_distribution={}
         )
-    rated_q = select(Rating).where(Rating.date == latest_date, Rating.model_type == model_type)
+    rated_q = (
+        select(Rating)
+        .join(Stock, Rating.code == Stock.code)
+        .where(Rating.date == latest_date, Rating.model_type == model_type, Stock.is_active == 1)
+    )
     result = await db.execute(rated_q)
     ratings = result.scalars().all()
     rated_count = len(ratings)
@@ -322,7 +326,11 @@ async def get_latest_ratings(
     )
     if not latest_date:
         return []
-    q = select(Rating).where(Rating.date == latest_date, Rating.model_type == model_type)
+    q = (
+        select(Rating)
+        .join(Stock, Rating.code == Stock.code)
+        .where(Rating.date == latest_date, Rating.model_type == model_type, Stock.is_active == 1)
+    )
     if market:
         q = q.where(Rating.market == market)
     if rating:
@@ -366,7 +374,11 @@ async def get_ratings_by_date(
     db: AsyncSession = Depends(get_db),
 ):
     """获取指定日期的评级"""
-    q = select(Rating).where(Rating.date == target_date, Rating.model_type == model_type)
+    q = (
+        select(Rating)
+        .join(Stock, Rating.code == Stock.code)
+        .where(Rating.date == target_date, Rating.model_type == model_type, Stock.is_active == 1)
+    )
     if market:
         q = q.where(Rating.market == market)
     q = q.order_by(desc(Rating.total_score))
