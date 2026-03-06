@@ -224,6 +224,8 @@ class PortfolioDailyReturn(BaseModel):
     date: str
     daily_return: float  # 当日收益率 %
     cumulative_return: float  # 累计收益率 %
+    benchmark_hs300: Optional[float] = None  # 沪深300累计收益率 %
+    benchmark_realestate: Optional[float] = None  # 地产指数累计收益率 %
 
 
 class PortfolioPerformance(BaseModel):
@@ -247,3 +249,21 @@ class DailyDigestOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ========== AI推荐选股相关 ==========
+class AIPickItem(BaseModel):
+    stock_code: str
+    stock_name: str
+    market: str
+    weight: float  # AI建议仓位 %
+    rating: Optional[str] = None
+    score: Optional[float] = None
+    reason: str = ""
+
+
+class AIPicksOut(BaseModel):
+    picks: list[AIPickItem]
+    generated_date: str
+    model_sources: str
+    performance: Optional[PortfolioPerformance] = None

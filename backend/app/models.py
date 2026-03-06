@@ -175,3 +175,14 @@ class DailyDigest(Base):
     content = Column(Text, nullable=False)
     model_sources = Column(String(200), default="")  # 使用的模型来源，如 "DeepSeek,GLM-5,Kimi"
     created_at = Column(DateTime, default=datetime.now)
+
+
+class AIPick(Base):
+    """AI推荐选股组合（每日缓存）"""
+    __tablename__ = "ai_picks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pick_date = Column(Date, nullable=False, index=True, unique=True)
+    picks_json = Column(Text, nullable=False)  # JSON: [{code, name, market, weight, reason}]
+    model_sources = Column(String(200), default="")
+    created_at = Column(DateTime, default=datetime.now)

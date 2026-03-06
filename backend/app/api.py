@@ -3,6 +3,7 @@ API路由 - 包含评级、认证、点评、报告模块
 """
 
 import json
+import logging
 import os
 import uuid
 from datetime import date, datetime, timedelta, timezone
@@ -20,7 +21,7 @@ from app.auth import (
 )
 from app.config import UPLOAD_DIR
 from app.database import get_db
-from app.models import Stock, Rating, StockPrice, User, Commentary, Report, Watchlist, PortfolioWeight, DailyDigest
+from app.models import Stock, Rating, StockPrice, User, Commentary, Report, Watchlist, PortfolioWeight, DailyDigest, AIPick
 from app.news_fetcher import fetch_filtered_news, fetch_stock_news
 from app.ifind_client import fetch_recent_announcements, fetch_reports
 from app.schemas import (
@@ -31,9 +32,11 @@ from app.schemas import (
     WatchlistAdd, WatchlistOut, WatchlistAnalysisItem,
     PortfolioWeightUpdate, PortfolioWeightOut, PortfolioPerformance, PortfolioDailyReturn,
     DailyDigestOut,
+    AIPickItem, AIPicksOut,
 )
 
 router = APIRouter(prefix="/api")
+logger = logging.getLogger(__name__)
 
 # 确保上传目录存在
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -1041,11 +1044,11 @@ async def get_portfolio_performance(
         cumulative = (cum_factor - 1) * 100
         daily_returns.append(PortfolioDailyReturn(
             date=str(d),
-            daily_return=round(portfolio_ret, 4),
-            cumulative_return=round(cumulative, 4),
+            daily_return=round(portfolio_ret, 2),
+            cumulative_return=round(cumulative, 2),
         ))
 
-    total_return = round(cumulative, 4)
+    total_return = round(cumulative, 2)
 
     # 年化收益率
     annualized = None
@@ -1064,7 +1067,19 @@ async def get_portfolio_performance(
             dd = peak - dr.cumulative_return
             if dd > mdd:
                 mdd = dd
-        max_drawdown = round(mdd, 4)
+        max_drawdown = round(mdd, 2)
+
+    # 获取基准指数数据（沪深300 + 房地产指数）
+    try:
+        benchmark_data = await _fetch_benchmark_returns(all_dates)
+        for dr in daily_returns:
+            d_str = dr.date
+            if d_str in benchmark_data.get("hs300", {}):
+                dr.benchmark_hs300 = benchmark_data["hs300"][d_str]
+            if d_str in benchmark_data.get("realestate", {}):
+                dr.benchmark_realestate = benchmark_data["realestate"][d_str]
+    except Exception as e:
+        logger.warning(f"获取基准指数数据失败: {e}")
 
     return PortfolioPerformance(
         weights=weights_out,
@@ -1073,6 +1088,326 @@ async def get_portfolio_performance(
         annualized_return=annualized,
         max_drawdown=max_drawdown,
     )
+
+
+# ========== 基准指数数据 ==========
+
+import asyncio as _asyncio
+
+async def _fetch_benchmark_returns(dates: list) -> dict:
+    """获取沪深300和房地产指数的累计收益率（与组合同期对比）"""
+    import asyncio
+    from app.data_fetcher import _tencent_a_stock_hist
+
+    if not dates:
+        return {}
+
+    first_date = dates[0]
+    days_needed = (date.today() - first_date).days + 20
+
+    def _fetch_hs300():
+        return _tencent_a_stock_hist("000300", days_needed)
+
+    def _fetch_realestate():
+        return _tencent_a_stock_hist("880482", days_needed)
+
+    hs300_df, re_df = await asyncio.gather(
+        asyncio.to_thread(_fetch_hs300),
+        asyncio.to_thread(_fetch_realestate),
+    )
+
+    result = {"hs300": {}, "realestate": {}}
+    date_strs = set(str(d) for d in dates)
+
+    for label, df in [("hs300", hs300_df), ("realestate", re_df)]:
+        if df is None or df.empty:
+            continue
+        df = df.sort_values("date")
+        closes = list(zip(df["date"].tolist(), df["close"].tolist()))
+        # 找到起始日或之前最近的价格作为基准
+        base_price = None
+        for d_val, c in closes:
+            d_str = str(d_val)
+            if d_str >= str(first_date):
+                if base_price is None:
+                    base_price = c
+                break
+            base_price = c
+        if base_price is None or base_price <= 0:
+            continue
+        # 实际用第一天之前的收盘价做基准
+        prev_price = None
+        for d_val, c in closes:
+            if str(d_val) >= str(first_date):
+                break
+            prev_price = c
+        if prev_price and prev_price > 0:
+            base_price = prev_price
+
+        for d_val, c in closes:
+            d_str = str(d_val)
+            if d_str in date_strs and c and base_price > 0:
+                result[label][d_str] = round((c / base_price - 1) * 100, 2)
+
+    return result
+
+
+# ========== AI推荐选股接口 ==========
+
+@router.get("/ai-picks")
+async def get_ai_picks(
+    force: bool = Query(False),
+    days: int = Query(default=30, ge=1, le=365),
+    user: User = Depends(require_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """获取AI推荐选股组合（每日缓存）"""
+    today = date.today()
+
+    # 查找缓存
+    picks_data = None
+    if not force:
+        cached = await db.execute(
+            select(AIPick).where(AIPick.pick_date == today)
+        )
+        existing = cached.scalar_one_or_none()
+        if existing:
+            picks_data = json.loads(existing.picks_json)
+            model_sources = existing.model_sources
+
+    if picks_data is None:
+        # 生成AI选股
+        picks_data, model_sources = await _generate_ai_picks(db)
+        if not picks_data:
+            raise HTTPException(status_code=500, detail="AI选股生成失败，请稍后重试")
+
+        # 保存
+        if force:
+            await db.execute(delete(AIPick).where(AIPick.pick_date == today))
+        pick_record = AIPick(
+            pick_date=today,
+            picks_json=json.dumps(picks_data, ensure_ascii=False),
+            model_sources=model_sources,
+        )
+        db.add(pick_record)
+        await db.commit()
+
+    # 构建返回并计算收益率
+    picks_out = []
+    weight_map = {}
+    for p in picks_data:
+        code = p["code"]
+        stock_result = await db.execute(
+            select(Stock).where(Stock.code == code, Stock.is_active == 1)
+        )
+        stock = stock_result.scalar_one_or_none()
+        name = stock.name if stock else p.get("name", code)
+        market = stock.market if stock else p.get("market", "A")
+        weight = p.get("weight", 0)
+
+        # 获取评级
+        rating_val = None
+        score_val = None
+        for mt in ("quant_ai", "soochow"):
+            latest_date = await db.scalar(
+                select(func.max(Rating.date)).where(Rating.model_type == mt)
+            )
+            if latest_date:
+                r = await db.execute(
+                    select(Rating).where(Rating.code == code, Rating.date == latest_date, Rating.model_type == mt)
+                )
+                r_obj = r.scalar_one_or_none()
+                if r_obj:
+                    rating_val = r_obj.rating
+                    score_val = r_obj.total_score
+                    break
+
+        picks_out.append(AIPickItem(
+            stock_code=code,
+            stock_name=name,
+            market=market,
+            weight=weight,
+            rating=rating_val,
+            score=score_val,
+            reason=p.get("reason", ""),
+        ))
+        if weight > 0:
+            weight_map[code] = weight / 100.0
+
+    # 计算组合收益率
+    perf = None
+    if weight_map:
+        codes = list(weight_map.keys())
+        start_date = today - timedelta(days=days + 10)
+        price_q = (
+            select(StockPrice)
+            .where(StockPrice.code.in_(codes), StockPrice.date >= start_date)
+            .order_by(StockPrice.date)
+        )
+        price_rows = (await db.execute(price_q)).scalars().all()
+        from collections import defaultdict
+        price_by_code = defaultdict(list)
+        for p in price_rows:
+            price_by_code[p.code].append((p.date, p.close))
+
+        daily_returns_by_code = {}
+        for code, prices in price_by_code.items():
+            prices.sort(key=lambda x: x[0])
+            returns = []
+            for i in range(1, len(prices)):
+                if prices[i-1][1] and prices[i-1][1] > 0:
+                    ret = (prices[i][1] - prices[i-1][1]) / prices[i-1][1] * 100
+                    returns.append((prices[i][0], ret))
+            daily_returns_by_code[code] = dict(returns)
+
+        all_dates = sorted(set(
+            d for rets in daily_returns_by_code.values() for d in rets.keys()
+        ))
+        all_dates = all_dates[-days:] if len(all_dates) > days else all_dates
+
+        daily_rets = []
+        cum_factor = 1.0
+        for d in all_dates:
+            port_ret = 0
+            for code, w in weight_map.items():
+                stock_ret = daily_returns_by_code.get(code, {}).get(d, 0)
+                port_ret += stock_ret * w
+            cum_factor *= (1 + port_ret / 100)
+            cumulative = (cum_factor - 1) * 100
+            daily_rets.append(PortfolioDailyReturn(
+                date=str(d),
+                daily_return=round(port_ret, 2),
+                cumulative_return=round(cumulative, 2),
+            ))
+
+        total_ret = round((cum_factor - 1) * 100, 2)
+        ann = None
+        if len(daily_rets) > 1:
+            ann = round(((cum_factor ** (252 / len(daily_rets))) - 1) * 100, 2)
+        mdd = 0
+        peak = -999
+        for dr in daily_rets:
+            if dr.cumulative_return > peak:
+                peak = dr.cumulative_return
+            dd = peak - dr.cumulative_return
+            if dd > mdd:
+                mdd = dd
+
+        # 基准对比
+        try:
+            bm = await _fetch_benchmark_returns(all_dates)
+            for dr in daily_rets:
+                if dr.date in bm.get("hs300", {}):
+                    dr.benchmark_hs300 = bm["hs300"][dr.date]
+                if dr.date in bm.get("realestate", {}):
+                    dr.benchmark_realestate = bm["realestate"][dr.date]
+        except Exception:
+            pass
+
+        perf = PortfolioPerformance(
+            weights=[PortfolioWeightOut(
+                stock_code=p.stock_code, stock_name=p.stock_name,
+                market=p.market, weight=p.weight
+            ) for p in picks_out if p.weight > 0],
+            daily_returns=daily_rets,
+            total_return=total_ret,
+            annualized_return=ann,
+            max_drawdown=round(mdd, 2) if mdd > 0 else None,
+        )
+
+    return AIPicksOut(
+        picks=picks_out,
+        generated_date=str(today),
+        model_sources=model_sources,
+        performance=perf,
+    )
+
+
+async def _generate_ai_picks(db: AsyncSession) -> tuple:
+    """AI三模型联合生成推荐选股组合"""
+    import asyncio
+    import re
+    from app.llm_client import chat_deepseek, chat_glm, chat_kimi
+    from app.config import DEEPSEEK_ENABLED, GLM_ENABLED, KIMI_ENABLED
+
+    # 获取最新评级数据
+    summaries = []
+    for model_type in ("quant_ai", "soochow"):
+        latest_date = await db.scalar(
+            select(func.max(Rating.date)).where(Rating.model_type == model_type)
+        )
+        if not latest_date:
+            continue
+        result = await db.execute(
+            select(Rating)
+            .join(Stock, Rating.code == Stock.code)
+            .where(Rating.date == latest_date, Rating.model_type == model_type, Stock.is_active == 1)
+            .order_by(desc(Rating.total_score))
+        )
+        ratings = result.scalars().all()
+        top10 = ratings[:10]
+        for r in top10:
+            summaries.append(
+                f"{r.name}({r.code},{r.market}股): {model_type}评分{r.total_score:.1f}/{r.rating}"
+                + (f", 理由:{r.reason[:120]}" if r.reason else "")
+            )
+
+    if not summaries:
+        return None, ""
+
+    prompt = f"""你是一位专业的房地产行业量化投资组合经理。以下是当前评级系统中排名靠前的房地产股票：
+
+{chr(10).join(summaries)}
+
+请从中选出5-8只股票构建一个最优投资组合，并分配仓位权重（百分比之和=100%）。要求：
+1. 综合考虑评分、评级、不同市场分散性
+2. 优选评级的股票给予更高权重
+3. A股、港股适当分散
+4. 每只股票给出简短的入选理由（不超过50字）
+
+请严格按以下JSON数组格式返回，不要附加其他文字：
+[{{"code":"股票代码","name":"股票名称","market":"A/HK/US","weight":仓位百分比,"reason":"入选理由"}}]"""
+
+    system = "你是房地产行业量化投资组合经理，请直接返回JSON数组，不要有其他文字。"
+
+    tasks = []
+    task_labels = []
+    if DEEPSEEK_ENABLED:
+        tasks.append(chat_deepseek(prompt, system=system, temperature=0.3))
+        task_labels.append("DeepSeek")
+    if GLM_ENABLED:
+        tasks.append(chat_glm(prompt, system=system, temperature=0.3))
+        task_labels.append("GLM-5")
+    if KIMI_ENABLED:
+        tasks.append(chat_kimi(prompt, system=system))
+        task_labels.append("Kimi")
+
+    if not tasks:
+        return None, ""
+
+    raw_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    for resp, label in zip(raw_results, task_labels):
+        if isinstance(resp, Exception) or not resp:
+            continue
+        try:
+            json_match = re.search(r'\[.*\]', resp, re.DOTALL)
+            if json_match:
+                parsed = json.loads(json_match.group())
+                if parsed and len(parsed) >= 3:
+                    # 验证并规范化权重
+                    total_w = sum(p.get("weight", 0) for p in parsed)
+                    if total_w > 0:
+                        for p in parsed:
+                            p["weight"] = round(p.get("weight", 0) / total_w * 100, 1)
+                        # 修正最后一个使总和精确为100
+                        diff = 100 - sum(p["weight"] for p in parsed)
+                        parsed[-1]["weight"] = round(parsed[-1]["weight"] + diff, 1)
+                        return parsed, ",".join(task_labels)
+        except Exception as e:
+            logger.warning(f"解析{label}AI选股失败: {e}")
+
+    return None, ""
 
 
 # ========== 每日AI日报接口 ==========
@@ -1306,8 +1641,7 @@ async def _generate_digest_with_multi_model(prompt: str) -> dict:
     return {"title": title, "content": content, "sources": source_str}
 
 
-import logging as _logging
-_digest_logger = _logging.getLogger(__name__)
+
 
 
 @router.get("/digest/industry", response_model=DailyDigestOut)
