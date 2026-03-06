@@ -116,7 +116,7 @@ export default function DailyDigestPanel({ type, onRefresh }) {
           >
             {loading ? '生成中...' : '刷新'}
           </button>
-          <span className="digest-toggle">{expanded ? '▲' : '▼'}</span>
+          <span className={`digest-toggle ${expanded ? 'expanded' : ''}`}>&#x25B6;</span>
         </div>
       </div>
 
@@ -165,23 +165,23 @@ export default function DailyDigestPanel({ type, onRefresh }) {
       <style>{`
         .digest-panel {
           margin-top: 16px;
-          border-radius: 12px;
+          border-radius: var(--radius, 12px);
           overflow: hidden;
           border: 1px solid var(--border, #e5e7eb);
-          background: var(--card-bg, #fff);
+          background: var(--bg-card, #fff);
+          box-shadow: var(--shadow, 0 1px 3px rgba(0,0,0,0.04));
         }
         .digest-header {
-          padding: 10px 20px;
+          padding: 16px 20px;
           cursor: pointer;
           display: flex;
           justify-content: space-between;
           align-items: center;
           transition: background 0.2s;
-          background: var(--bg, #f9fafb);
-          border-bottom: 1px solid var(--border, #e5e7eb);
+          user-select: none;
         }
         .digest-header:hover {
-          background: #f3f4f6;
+          background: var(--bg-hover, #f9fafb);
         }
         .digest-header-left {
           display: flex;
@@ -225,8 +225,12 @@ export default function DailyDigestPanel({ type, onRefresh }) {
           cursor: wait;
         }
         .digest-toggle {
+          font-size: 10px;
           color: var(--text-muted, #9ca3af);
-          font-size: 12px;
+          transition: transform 0.25s ease;
+        }
+        .digest-toggle.expanded {
+          transform: rotate(90deg);
         }
         .digest-body {
           padding: 20px;
