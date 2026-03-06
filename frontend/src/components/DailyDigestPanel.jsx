@@ -17,8 +17,6 @@ export default function DailyDigestPanel({ type, onRefresh }) {
         ? await api.getAiPicksDigest(force)
         : await api.getWatchlistDigest(force)
       setDigest(data)
-      // 数据加载成功后自动展开（已有缓存时用户可直接看到内容）
-      if (data && !force) setExpanded(true)
     } catch (err) {
       if (err.message?.includes('404')) {
         setError(type === 'industry' ? '暂无评级数据，无法生成日报' : type === 'ai_picks' ? '请先生成AI推荐组合' : '请先添加自选股')
