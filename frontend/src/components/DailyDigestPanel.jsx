@@ -168,7 +168,7 @@ export default function DailyDigestPanel({ type, onRefresh }) {
           background: var(--card-bg, #fff);
         }
         .digest-header {
-          padding: 14px 20px;
+          padding: 10px 20px;
           cursor: pointer;
           display: flex;
           justify-content: space-between;
@@ -186,13 +186,13 @@ export default function DailyDigestPanel({ type, onRefresh }) {
           gap: 12px;
         }
         .digest-icon {
-          font-size: 28px;
+          font-size: 22px;
         }
         .digest-title {
           margin: 0;
           font-size: 15px;
-          font-weight: 600;
-          color: #1a1a1a;
+          font-weight: 700;
+          color: #667eea;
         }
         .digest-date {
           font-size: 12px;
