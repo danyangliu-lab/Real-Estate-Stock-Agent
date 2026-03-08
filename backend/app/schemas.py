@@ -232,7 +232,7 @@ class PortfolioPerformance(BaseModel):
     weights: list[PortfolioWeightOut]
     daily_returns: list[PortfolioDailyReturn]
     total_return: float  # 总收益率 %
-    annualized_return: Optional[float] = None  # 年化收益率 %
+    annualized_return: Optional[float] = None  # 7日年化收益率 %
     max_drawdown: Optional[float] = None  # 最大回撤 %
 
 

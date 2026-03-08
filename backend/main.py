@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select, func, delete
 
 from app.api import router
-from app.config import ADMIN_USERNAME, ADMIN_PASSWORD, UPLOAD_DIR
+from app.config import ADMIN_USERNAME, ADMIN_PASSWORD, UPLOAD_DIR, API_KEY, JWT_SECRET, JWT_ALGORITHM
 from app.database import init_db, async_session
 from app.models import Rating, Stock, User, DailyDigest, AIPick
 from app.auth import hash_password
@@ -190,17 +190,17 @@ async def lifespan(app: FastAPI):
         id="refresh_06",
         replace_existing=True,
     )
-    # 定时任务2: 每天 9:00 自动生成所有日报（评分完成后）
+    # 定时任务2: 每天 8:30 自动生成所有日报（评分完成后）
     scheduler.add_job(
         generate_all_digests,
         "cron",
-        hour=9,
-        minute=0,
-        id="digest_09",
+        hour=8,
+        minute=30,
+        id="digest_0830",
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("定时任务已启动: 每天 6:00 评分 + 9:00 生成日报")
+    logger.info("定时任务已启动: 每天 6:00 评分 + 8:30 生成日报")
 
     # 启动时检查并自动刷新（后台异步执行，不阻塞启动）
     asyncio.create_task(check_and_refresh())
@@ -222,6 +222,60 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ========== API Key 鉴权中间件 ==========
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import JSONResponse
+from jose import JWTError, jwt as jose_jwt
+
+# 不需要鉴权的路径前缀白名单
+_AUTH_WHITELIST = ("/api/auth/login", "/api/share/", "/health", "/docs", "/openapi.json")
+
+
+class APIKeyAuthMiddleware(BaseHTTPMiddleware):
+    """对所有 /api/ 请求进行鉴权：需要有效的 JWT Token 或 API Key"""
+
+    async def dispatch(self, request, call_next):
+        path = request.url.path
+
+        # 非 /api/ 路径（前端静态文件等）直接放行
+        if not path.startswith("/api/"):
+            return await call_next(request)
+
+        # 白名单路径直接放行
+        for prefix in _AUTH_WHITELIST:
+            if path.startswith(prefix):
+                return await call_next(request)
+
+        # 检查 Authorization header（JWT Token）
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            try:
+                jose_jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+                return await call_next(request)
+            except JWTError:
+                pass
+
+        # 检查 X-API-Key header
+        api_key = request.headers.get("x-api-key", "")
+        if API_KEY and api_key == API_KEY:
+            return await call_next(request)
+
+        # 都不满足，拒绝访问
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "未授权访问，请提供有效的登录令牌或 API Key"},
+        )
+
+
+if API_KEY:
+    app.add_middleware(APIKeyAuthMiddleware)
+    logger.info("API Key 鉴权中间件已启用")
+else:
+    logger.warning("未配置 API_KEY，API 鉴权中间件未启用（所有接口公开访问）")
+
 
 app.include_router(router)
 

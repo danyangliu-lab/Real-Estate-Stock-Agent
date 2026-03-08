@@ -41,6 +41,9 @@ JWT_SECRET = os.getenv("JWT_SECRET", "real-estate-stock-agent-secret-key-2025")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = 72
 
+# API Key 鉴权（为空则不启用API Key校验）
+API_KEY = os.getenv("API_KEY", "")
+
 # 默认管理员（首次启动自动创建）
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")

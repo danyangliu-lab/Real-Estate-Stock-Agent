@@ -1089,11 +1089,14 @@ async def get_portfolio_performance(
 
     total_return = round(cumulative, 2)
 
-    # 年化收益率
+    # 7日年化收益率：取最近7个交易日的收益率来年化
     annualized = None
-    if len(daily_returns) > 1:
-        trading_days = len(daily_returns)
-        annualized = round(((cum_factor ** (252 / trading_days)) - 1) * 100, 2)
+    if len(daily_returns) >= 2:
+        recent_n = min(7, len(daily_returns))
+        recent_factor = 1.0
+        for dr in daily_returns[-recent_n:]:
+            recent_factor *= (1 + dr.daily_return / 100)
+        annualized = round(((recent_factor ** (365 / 7)) - 1) * 100, 2)
 
     # 最大回撤
     max_drawdown = None
@@ -1148,7 +1151,7 @@ async def _fetch_benchmark_returns(dates: list) -> dict:
         return _tencent_a_stock_hist("000300", days_needed)
 
     def _fetch_realestate():
-        return _tencent_a_stock_hist("880482", days_needed)
+        return _tencent_a_stock_hist("399393", days_needed)
 
     hs300_df, re_df = await asyncio.gather(
         asyncio.to_thread(_fetch_hs300),
@@ -1321,8 +1324,12 @@ async def get_ai_picks(
 
         total_ret = round((cum_factor - 1) * 100, 2)
         ann = None
-        if len(daily_rets) > 1:
-            ann = round(((cum_factor ** (252 / len(daily_rets))) - 1) * 100, 2)
+        if len(daily_rets) >= 2:
+            recent_n = min(7, len(daily_rets))
+            recent_factor = 1.0
+            for dr in daily_rets[-recent_n:]:
+                recent_factor *= (1 + dr.daily_return / 100)
+            ann = round(((recent_factor ** (365 / 7)) - 1) * 100, 2)
         mdd = 0
         peak = -999
         for dr in daily_rets:

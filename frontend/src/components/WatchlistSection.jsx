@@ -571,7 +571,7 @@ function PerformancePanel({ performance, perfDays, setPerfDays, loadPerformance,
         </div>
         {performance.annualized_return != null && (
           <div className="perf-stat">
-            <span className="perf-stat-label">年化收益率</span>
+            <span className="perf-stat-label">7日年化收益</span>
             <span className={`perf-stat-value ${performance.annualized_return >= 0 ? 'up' : 'down'}`}>
               {performance.annualized_return >= 0 ? '+' : ''}{performance.annualized_return.toFixed(2)}%
             </span>
@@ -596,7 +596,7 @@ function PerformancePanel({ performance, perfDays, setPerfDays, loadPerformance,
             )}
             {last.benchmark_realestate != null && (
               <div className="perf-stat">
-                <span className="perf-stat-label">地产指数</span>
+                <span className="perf-stat-label">中证地产</span>
                 <span className={`perf-stat-value ${last.benchmark_realestate >= 0 ? 'up' : 'down'}`} style={{ fontSize: 16 }}>
                   {last.benchmark_realestate >= 0 ? '+' : ''}{last.benchmark_realestate.toFixed(2)}%
                 </span>
@@ -611,7 +611,7 @@ function PerformancePanel({ performance, perfDays, setPerfDays, loadPerformance,
           <div className="chart-legend">
             <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: '#667eea' }} /> 组合</div>
             <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: '#f59e0b' }} /> 沪深300</div>
-            <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: '#8b5cf6' }} /> 地产指数</div>
+            <div className="chart-legend-item"><div className="chart-legend-dot" style={{ background: '#8b5cf6' }} /> 中证地产</div>
           </div>
         )}
         <PerformanceChart data={performance.daily_returns} />
@@ -625,7 +625,7 @@ function PerformancePanel({ performance, perfDays, setPerfDays, loadPerformance,
               <th>日收益率</th>
               <th>累计收益率</th>
               {hasBenchmark && <th>沪深300</th>}
-              {hasBenchmark && <th>地产指数</th>}
+              {hasBenchmark && <th>中证地产</th>}
             </tr>
           </thead>
           <tbody>
