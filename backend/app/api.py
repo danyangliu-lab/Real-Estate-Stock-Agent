@@ -1136,10 +1136,45 @@ async def get_portfolio_performance(
 
 import asyncio as _asyncio
 
+
+def _fetch_index_hist(symbol: str, days: int):
+    """直接用指定 symbol（如 sh000300）从腾讯财经获取指数日K线"""
+    import requests
+    import pandas as pd
+    from datetime import datetime, timedelta
+
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=days)
+    url = (
+        f"http://web.ifzq.gtimg.cn/appstock/app/fqkline/get?"
+        f"param={symbol},day,{start_date.strftime('%Y-%m-%d')},"
+        f"{end_date.strftime('%Y-%m-%d')},{days},qfq"
+    )
+    try:
+        resp = requests.get(url, timeout=15)
+        resp.raise_for_status()
+        data = resp.json()
+        kline_data = data.get("data", {}).get(symbol, {})
+        day_data = kline_data.get("qfqday") or kline_data.get("day")
+        if not day_data:
+            return None
+        rows = []
+        for item in day_data:
+            if len(item) >= 5:
+                rows.append({"date": item[0], "close": float(item[2])})
+        if not rows:
+            return None
+        df = pd.DataFrame(rows)
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        return df
+    except Exception as e:
+        logger.warning(f"腾讯指数 {symbol} 获取失败: {e}")
+        return None
+
+
 async def _fetch_benchmark_returns(dates: list) -> dict:
-    """获取沪深300和房地产指数的累计收益率（与组合同期对比）"""
+    """获取沪深300和中证地产指数的累计收益率（与组合同期对比）"""
     import asyncio
-    from app.data_fetcher import _tencent_a_stock_hist
 
     if not dates:
         return {}
@@ -1147,15 +1182,10 @@ async def _fetch_benchmark_returns(dates: list) -> dict:
     first_date = dates[0]
     days_needed = (date.today() - first_date).days + 20
 
-    def _fetch_hs300():
-        return _tencent_a_stock_hist("000300", days_needed)
-
-    def _fetch_realestate():
-        return _tencent_a_stock_hist("399393", days_needed)
-
+    # 沪深300: sh000300, 中证地产(399393): sz399393
     hs300_df, re_df = await asyncio.gather(
-        asyncio.to_thread(_fetch_hs300),
-        asyncio.to_thread(_fetch_realestate),
+        asyncio.to_thread(_fetch_index_hist, "sh000300", days_needed),
+        asyncio.to_thread(_fetch_index_hist, "sz399393", days_needed),
     )
 
     result = {"hs300": {}, "realestate": {}}
