@@ -569,11 +569,11 @@ function PerformancePanel({ performance, perfDays, setPerfDays, loadPerformance,
             {performance.total_return >= 0 ? '+' : ''}{performance.total_return.toFixed(2)}%
           </span>
         </div>
-        {performance.annualized_return != null && (
+        {performance.excess_return != null && (
           <div className="perf-stat">
-            <span className="perf-stat-label">7日年化收益</span>
-            <span className={`perf-stat-value ${performance.annualized_return >= 0 ? 'up' : 'down'}`}>
-              {performance.annualized_return >= 0 ? '+' : ''}{performance.annualized_return.toFixed(2)}%
+            <span className="perf-stat-label">超额收益</span>
+            <span className={`perf-stat-value ${performance.excess_return >= 0 ? 'up' : 'down'}`}>
+              {performance.excess_return >= 0 ? '+' : ''}{performance.excess_return.toFixed(2)}%
             </span>
           </div>
         )}

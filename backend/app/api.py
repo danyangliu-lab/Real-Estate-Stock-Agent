@@ -1089,15 +1089,6 @@ async def get_portfolio_performance(
 
     total_return = round(cumulative, 2)
 
-    # 7日年化收益率：取最近7个交易日的收益率来年化
-    annualized = None
-    if len(daily_returns) >= 2:
-        recent_n = min(7, len(daily_returns))
-        recent_factor = 1.0
-        for dr in daily_returns[-recent_n:]:
-            recent_factor *= (1 + dr.daily_return / 100)
-        annualized = round(((recent_factor ** (365 / 7)) - 1) * 100, 2)
-
     # 最大回撤
     max_drawdown = None
     if daily_returns:
@@ -1111,7 +1102,8 @@ async def get_portfolio_performance(
                 mdd = dd
         max_drawdown = round(mdd, 2)
 
-    # 获取基准指数数据（沪深300 + 房地产指数）
+    # 获取基准指数数据（沪深300 + 中证地产）
+    excess_return = None
     try:
         benchmark_data = await _fetch_benchmark_returns(all_dates)
         for dr in daily_returns:
@@ -1120,6 +1112,9 @@ async def get_portfolio_performance(
                 dr.benchmark_hs300 = benchmark_data["hs300"][d_str]
             if d_str in benchmark_data.get("realestate", {}):
                 dr.benchmark_realestate = benchmark_data["realestate"][d_str]
+        # 计算超额收益 = 组合总收益 - 中证地产同期收益
+        if daily_returns and daily_returns[-1].benchmark_realestate is not None:
+            excess_return = round(total_return - daily_returns[-1].benchmark_realestate, 2)
     except Exception as e:
         logger.warning(f"获取基准指数数据失败: {e}")
 
@@ -1127,8 +1122,8 @@ async def get_portfolio_performance(
         weights=weights_out,
         daily_returns=daily_returns,
         total_return=total_return,
-        annualized_return=annualized,
         max_drawdown=max_drawdown,
+        excess_return=excess_return,
     )
 
 
@@ -1353,13 +1348,6 @@ async def get_ai_picks(
             ))
 
         total_ret = round((cum_factor - 1) * 100, 2)
-        ann = None
-        if len(daily_rets) >= 2:
-            recent_n = min(7, len(daily_rets))
-            recent_factor = 1.0
-            for dr in daily_rets[-recent_n:]:
-                recent_factor *= (1 + dr.daily_return / 100)
-            ann = round(((recent_factor ** (365 / 7)) - 1) * 100, 2)
         mdd = 0
         peak = -999
         for dr in daily_rets:
@@ -1370,6 +1358,7 @@ async def get_ai_picks(
                 mdd = dd
 
         # 基准对比
+        excess_ret = None
         try:
             bm = await _fetch_benchmark_returns(all_dates)
             for dr in daily_rets:
@@ -1377,6 +1366,8 @@ async def get_ai_picks(
                     dr.benchmark_hs300 = bm["hs300"][dr.date]
                 if dr.date in bm.get("realestate", {}):
                     dr.benchmark_realestate = bm["realestate"][dr.date]
+            if daily_rets and daily_rets[-1].benchmark_realestate is not None:
+                excess_ret = round(total_ret - daily_rets[-1].benchmark_realestate, 2)
         except Exception:
             pass
 
@@ -1387,8 +1378,8 @@ async def get_ai_picks(
             ) for p in picks_out if p.weight > 0],
             daily_returns=daily_rets,
             total_return=total_ret,
-            annualized_return=ann,
             max_drawdown=round(mdd, 2) if mdd > 0 else None,
+            excess_return=excess_ret,
         )
 
     return AIPicksOut(
