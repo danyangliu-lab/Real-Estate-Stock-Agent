@@ -2755,7 +2755,7 @@ async def get_reits_list(
     sector: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    """获取全部C-REITs列表（含实时行情）"""
+    """获取全部C-REITs基础列表（纯数据库查询，秒级返回）"""
     query = select(REITItem).where(REITItem.is_active == 1)
     if sector:
         query = query.where(REITItem.sector == sector)
@@ -2767,26 +2767,9 @@ async def get_reits_list(
     if not items:
         return []
 
-    # 批量获取实时行情
-    codes = [it.code for it in items]
-    realtime = None
-    try:
-        from app.ifind_client import fetch_reit_realtime
-        realtime = fetch_reit_realtime(codes)
-    except Exception as e:
-        logger.warning(f"REITs实时行情获取失败: {e}")
-
-    # 尝试获取分红率
-    dividend_data = None
-    try:
-        from app.ifind_client import fetch_reit_dividend_yield
-        dividend_data = fetch_reit_dividend_yield(codes)
-    except Exception as e:
-        logger.debug(f"REITs分红率获取失败: {e}")
-
     out = []
     for it in items:
-        item_dict = {
+        out.append({
             "id": it.id,
             "code": it.code,
             "name": it.name,
@@ -2797,19 +2780,51 @@ async def get_reits_list(
             "dividend_yield": None,
             "turnover_ratio": None,
             "volume": None,
-        }
+        })
 
-        if realtime and it.code in realtime:
-            rt = realtime[it.code]
-            item_dict["latest_price"] = rt.get("latest")
-            item_dict["change_pct"] = rt.get("change_ratio")
-            item_dict["turnover_ratio"] = rt.get("turnover_ratio")
-            item_dict["volume"] = rt.get("volume")
+    return out
 
-        if dividend_data and it.code in dividend_data:
-            item_dict["dividend_yield"] = dividend_data[it.code]
 
-        out.append(item_dict)
+@router.get("/reits/realtime")
+async def get_reits_realtime(
+    db: AsyncSession = Depends(get_db),
+):
+    """获取REITs实时行情 + 分红率（前端异步懒加载，较慢）"""
+    result = await db.execute(
+        select(REITItem.code).where(REITItem.is_active == 1)
+    )
+    codes = [row[0] for row in result.all()]
+
+    if not codes:
+        return {}
+
+    out = {}
+    # 批量获取实时行情
+    try:
+        from app.ifind_client import fetch_reit_realtime
+        realtime = fetch_reit_realtime(codes)
+        if realtime:
+            for code, rt in realtime.items():
+                out[code] = {
+                    "latest_price": rt.get("latest"),
+                    "change_pct": rt.get("change_ratio"),
+                    "turnover_ratio": rt.get("turnover_ratio"),
+                    "volume": rt.get("volume"),
+                }
+    except Exception as e:
+        logger.warning(f"REITs实时行情获取失败: {e}")
+
+    # 批量获取分红率
+    try:
+        from app.ifind_client import fetch_reit_dividend_yield
+        dividend_data = fetch_reit_dividend_yield(codes)
+        if dividend_data:
+            for code, dy in dividend_data.items():
+                if code not in out:
+                    out[code] = {}
+                out[code]["dividend_yield"] = dy
+    except Exception as e:
+        logger.debug(f"REITs分红率获取失败: {e}")
 
     return out
 

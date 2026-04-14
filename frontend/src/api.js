@@ -207,6 +207,7 @@ export const api = {
     const qs = sector ? `?sector=${encodeURIComponent(sector)}` : ''
     return request(`/reits/list${qs}`)
   },
+  getREITsRealtime: () => request('/reits/realtime'),
   getREITsSectors: () => request('/reits/sectors'),
   getREITsWeeklyPicks: (force = false) =>
     request(`/reits/weekly-picks${force ? '?force=true' : ''}`),

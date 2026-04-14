@@ -71,7 +71,7 @@ export default function REITsSection({ user }) {
   const [sortBy, setSortBy] = useState('code')
   const [sortDir, setSortDir] = useState('asc')
 
-  // 加载REITs列表
+  // 加载REITs列表（两步加载：先基础数据秒级展示，再异步填充行情）
   const loadList = useCallback(async () => {
     setLoading(true)
     try {
@@ -81,10 +81,32 @@ export default function REITsSection({ user }) {
       ])
       setReitsList(list || [])
       setSectors(sec || {})
+      setLoading(false)
+
+      // 异步加载实时行情（不阻塞列表展示）
+      try {
+        const realtime = await api.getREITsRealtime()
+        if (realtime && typeof realtime === 'object') {
+          setReitsList(prev => prev.map(r => {
+            const rt = realtime[r.code]
+            if (!rt) return r
+            return {
+              ...r,
+              latest_price: rt.latest_price ?? r.latest_price,
+              change_pct: rt.change_pct ?? r.change_pct,
+              turnover_ratio: rt.turnover_ratio ?? r.turnover_ratio,
+              volume: rt.volume ?? r.volume,
+              dividend_yield: rt.dividend_yield ?? r.dividend_yield,
+            }
+          }))
+        }
+      } catch (e) {
+        console.warn('REITs实时行情加载失败（不影响列表展示）:', e)
+      }
     } catch (e) {
       console.error('加载REITs列表失败:', e)
+      setLoading(false)
     }
-    setLoading(false)
   }, [sectorFilter])
 
   // 加载每周推荐
@@ -181,7 +203,7 @@ export default function REITsSection({ user }) {
             style={{
               padding: '8px 20px',
               border: 'none',
-              background: subTab === t.key ? 'var(--primary)' : 'transparent',
+              background: subTab === t.key ? 'var(--accent, #2563eb)' : 'transparent',
               color: subTab === t.key ? '#fff' : 'var(--text-secondary)',
               fontWeight: subTab === t.key ? 600 : 400,
               cursor: 'pointer',
@@ -208,7 +230,7 @@ export default function REITsSection({ user }) {
             marginBottom: 16,
           }}>
             <div className="card" style={{ padding: '12px 16px', textAlign: 'center' }}>
-              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--primary)' }}>{totalReits}</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--accent, #2563eb)' }}>{totalReits}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>总只数</div>
             </div>
             <div className="card" style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -256,7 +278,7 @@ export default function REITsSection({ user }) {
             </div>
           ) : (
             <div className="card" style={{ overflowX: 'auto' }}>
-              <table className="rating-table">
+              <table className="table">
                 <thead>
                   <tr>
                     {[
@@ -544,7 +566,7 @@ export default function REITsSection({ user }) {
                 <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
                   推荐期: {backtest.week_start}
                 </div>
-                <table className="rating-table">
+                <table className="table">
                   <thead>
                     <tr>
                       <th>代码</th>
