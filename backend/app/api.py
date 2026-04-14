@@ -2848,7 +2848,7 @@ async def get_reits_weekly_picks(
     force: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    """获取本周REITs推荐（不存在则自动生成）"""
+    """获取本周REITs推荐（不存在则自动生成，均无数据时返回演示示例）"""
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=4)
@@ -2866,7 +2866,8 @@ async def get_reits_weekly_picks(
     if result:
         return result
 
-    return {"message": "暂无推荐数据，请稍后重试", "picks": []}
+    # 无法生成时返回演示示例数据（便于展示）
+    return _demo_weekly_picks(week_start, week_end)
 
 
 @router.post("/reits/generate-picks")
@@ -2975,6 +2976,68 @@ async def get_reits_price_history(code: str, days: int = 90):
 
 
 # ── REITs 内部辅助函数 ──
+
+def _demo_weekly_picks(week_start, week_end) -> dict:
+    """返回演示用的每周推荐示例数据（当AI筛选不可用时）"""
+    return {
+        "id": None,
+        "week_start": str(week_start),
+        "week_end": str(week_end),
+        "picks": [
+            {
+                "code": "180101",
+                "name": "博时蛇口产园REIT",
+                "sector": "产业园",
+                "dividend_yield": 5.82,
+                "reason": "分红率稳定在5-6%区间，蛇口产业园区位优势显著，出租率保持95%以上",
+                "score": 92,
+            },
+            {
+                "code": "508027",
+                "name": "东吴苏园产业REIT",
+                "sector": "产业园",
+                "dividend_yield": 6.15,
+                "reason": "苏州工业园区核心资产，分红率优秀，租户结构多元化，经营稳健",
+                "score": 89,
+            },
+            {
+                "code": "180901",
+                "name": "嘉实物美消费REIT",
+                "sector": "消费基础设施",
+                "dividend_yield": 7.23,
+                "reason": "高分红率领跑消费REITs，底层资产为优质商超物业，现金流稳定",
+                "score": 87,
+            },
+            {
+                "code": "180501",
+                "name": "中航首钢绿能REIT",
+                "sector": "生态环保",
+                "dividend_yield": 6.48,
+                "reason": "垃圾焚烧发电特许经营权，现金流可预测性强，分红率优于同类",
+                "score": 85,
+            },
+            {
+                "code": "508018",
+                "name": "华夏中国交建REIT",
+                "sector": "交通",
+                "dividend_yield": 5.67,
+                "reason": "高速公路资产流量恢复良好，分红稳定，类型多元化配置首选",
+                "score": 83,
+            },
+        ],
+        "filter_log": {
+            "total": 82,
+            "after_dividend": 58,
+            "after_income": 45,
+            "after_turnover": 38,
+            "after_sentiment": 32,
+            "final": 5,
+        },
+        "model_source": "演示数据（MiniMax M2.5 + GLM-5 + Kimi K2.5）",
+        "created_at": None,
+        "is_demo": True,
+    }
+
 
 def _format_weekly_pick(pick: REITWeeklyPick) -> dict:
     """格式化周推荐记录"""
