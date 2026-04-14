@@ -201,4 +201,23 @@ export const api = {
     request('/admin/refresh-ratings', { method: 'POST' }),
   adminRefreshStatus: () =>
     request('/admin/refresh-status'),
+
+  // ========== C-REITs ==========
+  getREITsList: (sector) => {
+    const qs = sector ? `?sector=${encodeURIComponent(sector)}` : ''
+    return request(`/reits/list${qs}`)
+  },
+  getREITsSectors: () => request('/reits/sectors'),
+  getREITsWeeklyPicks: (force = false) =>
+    request(`/reits/weekly-picks${force ? '?force=true' : ''}`),
+  generateREITsPicks: () =>
+    request('/reits/generate-picks', { method: 'POST' }),
+  getREITsPicksHistory: (limit = 10) =>
+    request(`/reits/weekly-picks/history?limit=${limit}`),
+  getREITsBacktest: (weekStart) => {
+    const qs = weekStart ? `?week_start=${weekStart}` : ''
+    return request(`/reits/backtest${qs}`)
+  },
+  getREITsPriceHistory: (code, days = 90) =>
+    request(`/reits/price-history/${code}?days=${days}`),
 }

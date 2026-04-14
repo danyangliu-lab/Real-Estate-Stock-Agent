@@ -12,10 +12,12 @@ import NewsSection from './components/NewsSection'
 import WatchlistSection from './components/WatchlistSection'
 import DailyDigestPanel from './components/DailyDigestPanel'
 import WeeklyDigestPanel from './components/WeeklyDigestPanel'
+import REITsSection from './components/REITsSection'
 
 const BASE_TABS = [
   { key: 'rating', label: 'AI评级' },
   { key: 'watchlist', label: '自选股' },
+  { key: 'reits', label: 'REITs' },
   { key: 'commentary', label: '市场点评' },
   { key: 'report', label: '研究报告' },
 ]
@@ -353,6 +355,7 @@ export default function App() {
         )}
 
         {activeTab === 'watchlist' && <WatchlistSection user={user} />}
+        {activeTab === 'reits' && <REITsSection user={user} />}
         {activeTab === 'commentary' && <CommentarySection user={user} />}
         {activeTab === 'report' && <ReportSection user={user} />}
         {activeTab === 'users' && user?.is_admin && <UserManagement />}

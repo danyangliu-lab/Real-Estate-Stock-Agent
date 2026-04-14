@@ -173,7 +173,7 @@ class DailyDigest(Base):
     user_id = Column(Integer, nullable=False, default=0)  # 0=全局(行业日报), >0=用户专属(自选股日报)
     title = Column(String(300), nullable=False)
     content = Column(Text, nullable=False)
-    model_sources = Column(String(200), default="")  # 使用的模型来源，如 "DeepSeek,GLM-5,Kimi"
+    model_sources = Column(String(200), default="")  # 使用的模型来源，如 "MiniMax,GLM-5,Kimi"
     created_at = Column(DateTime, default=datetime.now)
 
 
@@ -204,3 +204,64 @@ class AIPick(Base):
     picks_json = Column(Text, nullable=False)  # JSON: [{code, name, market, weight, reason}]
     model_sources = Column(String(200), default="")
     created_at = Column(DateTime, default=datetime.now)
+
+
+# ========== C-REITs 相关模型 ==========
+
+class REITItem(Base):
+    """C-REITs 基础信息"""
+    __tablename__ = "reit_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(20), nullable=False, unique=True, index=True)
+    name = Column(String(100), nullable=False)
+    sector = Column(String(50), default="")  # 产业园/仓储物流/保障性住房/消费基础设施/能源/交通/生态环保/数据中心
+    is_active = Column(Integer, default=1)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class REITPrice(Base):
+    """C-REITs 历史行情"""
+    __tablename__ = "reit_prices"
+    __table_args__ = (Index("ix_reit_price_code_date", "code", "date"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(20), nullable=False)
+    date = Column(Date, nullable=False)
+    open = Column(Float)
+    high = Column(Float)
+    low = Column(Float)
+    close = Column(Float)
+    volume = Column(Float)
+    turnover = Column(Float)
+    change_pct = Column(Float)
+
+
+class REITWeeklyPick(Base):
+    """C-REITs 每周推荐（每周5只）"""
+    __tablename__ = "reit_weekly_picks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    week_start = Column(Date, nullable=False, index=True)
+    week_end = Column(Date, nullable=False)
+    picks_json = Column(Text, nullable=False)  # JSON: [{code, name, sector, dividend_yield, reason, ...}]
+    filter_log = Column(Text, default="")  # JSON: 筛选过程日志 {total, after_dividend, after_income, after_turnover, after_sentiment}
+    model_source = Column(String(100), default="")  # 使用的AI模型
+    created_at = Column(DateTime, default=datetime.now)
+
+
+class REITBacktest(Base):
+    """C-REITs 回测结果"""
+    __tablename__ = "reit_backtests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    week_start = Column(Date, nullable=False, index=True)  # 对应哪一期推荐
+    code = Column(String(20), nullable=False)
+    name = Column(String(100), nullable=False)
+    pick_price = Column(Float)  # 推荐时价格
+    return_1m = Column(Float)  # 1个月收益率%
+    return_3m = Column(Float)  # 3个月收益率%
+    return_6m = Column(Float)  # 6个月收益率%
+    evaluation = Column(Text, default="")  # AI评价
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

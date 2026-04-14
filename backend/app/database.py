@@ -89,6 +89,58 @@ async def init_db():
         await conn.run_sync(Base.metadata.create_all)
         await _migrate_ratings_table(conn)
         await _migrate_watchlists_table(conn)
+        await _migrate_reits_tables(conn)
+
+
+async def _migrate_reits_tables(conn):
+    """创建C-REITs相关表（如已存在则忽略）"""
+    tables_sql = [
+        """CREATE TABLE IF NOT EXISTS reit_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code VARCHAR(20) NOT NULL UNIQUE,
+            name VARCHAR(100) NOT NULL,
+            sector VARCHAR(50) DEFAULT '',
+            is_active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE UNIQUE INDEX IF NOT EXISTS ix_reit_items_code ON reit_items (code)",
+        """CREATE TABLE IF NOT EXISTS reit_prices (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code VARCHAR(20) NOT NULL,
+            date DATE NOT NULL,
+            open FLOAT, high FLOAT, low FLOAT, close FLOAT,
+            volume FLOAT, turnover FLOAT, change_pct FLOAT
+        )""",
+        "CREATE INDEX IF NOT EXISTS ix_reit_price_code_date ON reit_prices (code, date)",
+        """CREATE TABLE IF NOT EXISTS reit_weekly_picks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_start DATE NOT NULL,
+            week_end DATE NOT NULL,
+            picks_json TEXT NOT NULL,
+            filter_log TEXT DEFAULT '',
+            model_source VARCHAR(100) DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE INDEX IF NOT EXISTS ix_reit_weekly_picks_week ON reit_weekly_picks (week_start)",
+        """CREATE TABLE IF NOT EXISTS reit_backtests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            week_start DATE NOT NULL,
+            code VARCHAR(20) NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            pick_price FLOAT,
+            return_1m FLOAT, return_3m FLOAT, return_6m FLOAT,
+            evaluation TEXT DEFAULT '',
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE INDEX IF NOT EXISTS ix_reit_backtests_week ON reit_backtests (week_start)",
+    ]
+    for sql in tables_sql:
+        try:
+            await conn.execute(text(sql))
+        except Exception:
+            pass
+    logger.info("C-REITs tables ready")
 
 
 async def get_db():

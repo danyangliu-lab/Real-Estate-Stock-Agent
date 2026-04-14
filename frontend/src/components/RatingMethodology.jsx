@@ -42,7 +42,7 @@ function QuantAIMethodology() {
         <span className="formula-plus">+</span>
         <span className="formula-part ai">AI大模型 × 50%</span>
       </div>
-      <div className="methodology-fallback">AI采用DeepSeek V3.2+GLM-5+Kimi K2.5三模型融合；情绪因子基于关键词+双速衰减+AI反馈；若基本面不可用则量化30%+情绪12%+AI58%</div>
+      <div className="methodology-fallback">AI采用MiniMax M2.5+GLM-5+Kimi K2.5三模型融合；情绪因子基于关键词+双速衰减+AI反馈；若基本面不可用则量化30%+情绪12%+AI58%</div>
 
       <div className="methodology-columns">
         {/* 列1: 量化 */}
@@ -107,7 +107,7 @@ function QuantAIMethodology() {
             AI大模型评分 (50%)
           </div>
           <div className="methodology-col-desc">
-            由DeepSeek V3.2+GLM-5+Kimi K2.5三模型融合，结合iFinD数据+实时联网搜索进行专业分析
+            由MiniMax M2.5+GLM-5+Kimi K2.5三模型融合，结合iFinD数据+实时联网搜索进行专业分析
           </div>
           <div className="dimension-list">
             <DimensionItem name="政策资讯影响" weight="35%" desc="最新房地产政策、调控文件、行业新闻、iFinD公告，实时联网获取" />

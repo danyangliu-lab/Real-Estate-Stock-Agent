@@ -1,5 +1,5 @@
 """
-腾讯云多模型客户端（DeepSeek V3.2 + GLM-5 + Kimi K2.5 三模型）
+腾讯云多模型客户端（MiniMax M2.5 + GLM-5 + Kimi K2.5 三模型）
 - 三个模型均使用 LKEAP OpenAI 兼容接口（Bearer Token）
 """
 
@@ -9,7 +9,7 @@ from typing import Optional
 import httpx
 
 from app.config import (
-    DEEPSEEK_MODEL, DEEPSEEK_ENABLED,
+    MINIMAX_MODEL, MINIMAX_ENABLED,
     GLM_MODEL, GLM_ENABLED,
     KIMI_MODEL, KIMI_ENABLED,
     LKEAP_API_KEY,
@@ -82,7 +82,26 @@ async def _call_lkeap_openai(
         return None
 
 
-# ── DeepSeek V3.2 ──
+# ── MiniMax M2.5 ──
+
+async def chat_minimax(
+    prompt: str,
+    system: str = "",
+    temperature: float = 0.3,
+    enable_search: bool = False,
+) -> Optional[str]:
+    """调用 MiniMax M2.5（LKEAP OpenAI 兼容接口）"""
+    if not MINIMAX_ENABLED:
+        return None
+    return await _call_lkeap_openai(
+        model=MINIMAX_MODEL,
+        prompt=prompt,
+        system=system,
+        temperature=temperature,
+        enable_search=enable_search,
+        label="MiniMax",
+    )
+
 
 async def chat_deepseek(
     prompt: str,
@@ -90,17 +109,8 @@ async def chat_deepseek(
     temperature: float = 0.3,
     enable_search: bool = False,
 ) -> Optional[str]:
-    """调用 DeepSeek V3.2（LKEAP OpenAI 兼容接口）"""
-    if not DEEPSEEK_ENABLED:
-        return None
-    return await _call_lkeap_openai(
-        model=DEEPSEEK_MODEL,
-        prompt=prompt,
-        system=system,
-        temperature=temperature,
-        enable_search=enable_search,
-        label="DeepSeek",
-    )
+    """chat_minimax 的兼容别名（原 DeepSeek 接口已切换为 MiniMax M2.5）"""
+    return await chat_minimax(prompt, system, temperature, enable_search)
 
 
 async def chat_hunyuan(
@@ -109,8 +119,8 @@ async def chat_hunyuan(
     temperature: float = 0.3,
     enable_search: bool = False,
 ) -> Optional[str]:
-    """chat_deepseek 的别名，兼容旧版调用"""
-    return await chat_deepseek(prompt, system, temperature, enable_search)
+    """chat_minimax 的别名，兼容旧版调用"""
+    return await chat_minimax(prompt, system, temperature, enable_search)
 
 
 # ── GLM-5 ──

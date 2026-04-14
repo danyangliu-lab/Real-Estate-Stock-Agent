@@ -16,10 +16,9 @@ from sqlalchemy import select, func, delete
 from app.api import router
 from app.config import ADMIN_USERNAME, ADMIN_PASSWORD, UPLOAD_DIR, API_KEY, JWT_SECRET, JWT_ALGORITHM
 from app.database import init_db, async_session
-from app.models import Rating, Stock, User, DailyDigest, WeeklyDigest, AIPick
+from app.models import Rating, Stock, User, DailyDigest, WeeklyDigest, AIPick, REITItem, REITWeeklyPick
 from app.auth import hash_password
 from app.scheduler import init_stock_list, refresh_all_data
-from app.news_fetcher import preload_news_cache
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,18 +56,21 @@ async def init_admin():
 
 
 async def check_and_refresh():
-    """检查今日两个模型是否都有足够的评级数据，不足则自动刷新"""
+    """检查本周是否已有足够的评级数据，不足则自动刷新（评分已改为每周一次）"""
+    from datetime import timedelta
     today = date.today()
+    # 检查最近7天内是否有评级数据
+    week_ago = today - timedelta(days=7)
     async with async_session() as session:
-        # 分别检查两个模型今日的评级数量
+        # 分别检查两个模型最近7天的评级数量
         quant_count = await session.scalar(
             select(func.count(Rating.id)).where(
-                Rating.date == today, Rating.model_type == "quant_ai"
+                Rating.date >= week_ago, Rating.model_type == "quant_ai"
             )
         )
         soochow_count = await session.scalar(
             select(func.count(Rating.id)).where(
-                Rating.date == today, Rating.model_type == "soochow"
+                Rating.date >= week_ago, Rating.model_type == "soochow"
             )
         )
         # 检查活跃股票总数
@@ -76,15 +78,15 @@ async def check_and_refresh():
             select(func.count(Stock.id)).where(Stock.is_active == 1)
         )
 
-    logger.info(f"今日评级检查: quant_ai={quant_count}, soochow={soochow_count}, 活跃股票={stock_count}")
+    logger.info(f"本周评级检查: quant_ai={quant_count}, soochow={soochow_count}, 活跃股票={stock_count}")
 
     # 任一模型评级数量不足活跃股票数的80%，就触发全量刷新
     threshold = int(stock_count * 0.8) if stock_count else 0
     if quant_count < threshold or soochow_count < threshold:
-        logger.info(f"评级数据不完整(阈值={threshold})，启动自动刷新...")
+        logger.info(f"本周评级数据不完整(阈值={threshold})，启动自动刷新...")
         await refresh_all_data()
     else:
-        logger.info(f"今日({today})双模型评级数据已完整，跳过刷新")
+        logger.info(f"本周双模型评级数据已完整，跳过刷新")
 
 
 async def generate_all_digests():
@@ -256,6 +258,62 @@ async def generate_all_weeklies():
     logger.info("每周周报自动生成完成")
 
 
+async def init_reits_list():
+    """初始化C-REITs清单到数据库"""
+    from app.reits_list import UNIQUE_CREITS
+
+    async with async_session() as session:
+        existing_count = await session.scalar(select(func.count(REITItem.id)))
+        if existing_count and existing_count >= len(UNIQUE_CREITS) * 0.8:
+            logger.info(f"C-REITs已初始化({existing_count}只)，跳过")
+            return
+
+        added = 0
+        for reit in UNIQUE_CREITS:
+            result = await session.execute(
+                select(REITItem).where(REITItem.code == reit["code"])
+            )
+            if result.scalar_one_or_none():
+                continue
+            item = REITItem(
+                code=reit["code"],
+                name=reit["name"],
+                sector=reit["sector"],
+                is_active=1,
+            )
+            session.add(item)
+            added += 1
+
+        if added:
+            await session.commit()
+            logger.info(f"C-REITs清单已初始化: 新增{added}只")
+        else:
+            logger.info("C-REITs清单无需更新")
+
+
+async def generate_reit_weekly_picks():
+    """每周一自动生成C-REITs推荐"""
+    from app.api import _generate_reit_weekly_picks, _update_reit_backtests
+
+    logger.info("开始自动生成C-REITs每周推荐...")
+    async with async_session() as db:
+        try:
+            result = await _generate_reit_weekly_picks(db)
+            if result:
+                logger.info(f"✓ C-REITs每周推荐已生成")
+            else:
+                logger.warning("C-REITs每周推荐生成失败")
+        except Exception as e:
+            logger.error(f"C-REITs每周推荐异常: {e}")
+
+        # 同时更新回测数据
+        try:
+            await _update_reit_backtests(db)
+            logger.info("✓ C-REITs回测数据已更新")
+        except Exception as e:
+            logger.error(f"C-REITs回测更新异常: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     import os
@@ -264,28 +322,41 @@ async def lifespan(app: FastAPI):
     # 启动
     await init_db()
     await init_stock_list()
+    await init_reits_list()
     await init_admin()
     logger.info("数据库初始化完成")
 
-    # 定时任务1: 每天 6:00 自动刷新数据和评分
+    # 定时任务1: 每周日 1:00 自动刷新地产股数据和评分（一周一次）
     scheduler.add_job(
         refresh_all_data,
         "cron",
-        hour=6,
+        day_of_week="sun",
+        hour=1,
         minute=0,
-        id="refresh_06",
+        id="refresh_sun_01",
         replace_existing=True,
     )
-    # 定时任务2: 每天 8:30 自动生成所有日报（评分完成后）
+    # 定时任务2: 每周日 1:00 自动生成C-REITs每周推荐（与评分同步）
+    scheduler.add_job(
+        generate_reit_weekly_picks,
+        "cron",
+        day_of_week="sun",
+        hour=1,
+        minute=5,
+        id="reits_sun_0105",
+        replace_existing=True,
+    )
+    # 定时任务3: 每周日 9:30 自动生成所有日报（评分完成后）
     scheduler.add_job(
         generate_all_digests,
         "cron",
-        hour=8,
+        day_of_week="sun",
+        hour=9,
         minute=30,
-        id="digest_0830",
+        id="digest_sun_0930",
         replace_existing=True,
     )
-    # 定时任务3: 每周五 17:00 自动生成周报（收盘后汇总全周数据）
+    # 定时任务4: 每周五 17:00 自动生成周报（收盘后汇总全周数据）
     scheduler.add_job(
         generate_all_weeklies,
         "cron",
@@ -296,12 +367,10 @@ async def lifespan(app: FastAPI):
         replace_existing=True,
     )
     scheduler.start()
-    logger.info("定时任务已启动: 每天 6:00 评分 + 8:30 生成日报 + 每周五 17:00 生成周报")
+    logger.info("定时任务已启动: 每周日 1:00 评分+REITs推荐 + 9:30 生成日报 + 每周五 17:00 生成周报")
 
     # 启动时检查并自动刷新（后台异步执行，不阻塞启动）
     asyncio.create_task(check_and_refresh())
-    # 预热新闻缓存（后台异步，不阻塞启动）
-    asyncio.create_task(preload_news_cache())
 
     yield
 

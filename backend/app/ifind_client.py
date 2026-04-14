@@ -188,6 +188,7 @@ def to_ifind_code(code: str, market: str) -> str:
     A股: 000002 → 000002.SZ / 600048 → 600048.SH
     港股: 02007 → 2007.HK, 00688 → 0688.HK (数字部分去多余前导零，至少保留4位)
     美股: KE → KE.N (暂不支持，保留)
+    REITs: 508000 → 508000.SH, 180101 → 180101.OF
     """
     if market == "A":
         if code.startswith(("6", "9")):
@@ -202,6 +203,12 @@ def to_ifind_code(code: str, market: str) -> str:
         return f"{num}.HK"
     elif market == "US":
         return f"{code}.N"
+    elif market == "REIT":
+        # C-REITs代码: 508xxx → 508xxx.SH（场内交易），180xxx → 180xxx.OF（场外）
+        if code.startswith("508"):
+            return f"{code}.SH"
+        else:
+            return f"{code}.OF"
     return code
 
 
@@ -766,6 +773,276 @@ def get_data_volume() -> Optional[dict]:
     if data and data.get("errorcode") == 0:
         return data.get("data", {})
     return None
+
+
+# =====================================================================
+# REITs 专用数据获取
+# =====================================================================
+
+def fetch_reit_history(code: str, days: int = 180) -> Optional[pd.DataFrame]:
+    """获取C-REITs历史日K线数据
+    Args:
+        code: REITs代码，如 "508000"
+        days: 回溯天数
+    Returns:
+        DataFrame: date, open, high, low, close, volume, turnover, change_pct
+    """
+    ifind_code = to_ifind_code(code, "REIT")
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    start_date = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+    data = _post("cmd_history_quotation", {
+        "codes": ifind_code,
+        "indicators": "open,high,low,close,volume,amount,changeRatio",
+        "startdate": start_date,
+        "enddate": end_date,
+    }, f"REITs历史行情 {ifind_code}")
+
+    if not data:
+        return None
+
+    tables = data.get("tables", [])
+    if not tables:
+        return None
+
+    t = tables[0]
+    times = t.get("time", [])
+    tbl = t.get("table", {})
+
+    if not times or "close" not in tbl:
+        return None
+
+    rows = []
+    n = len(times)
+    opens = tbl.get("open", [None] * n)
+    highs = tbl.get("high", [None] * n)
+    lows = tbl.get("low", [None] * n)
+    closes = tbl.get("close", [None] * n)
+    volumes = tbl.get("volume", [0] * n)
+    amounts = tbl.get("amount", [0] * n)
+    change_ratios = tbl.get("changeRatio", [0] * n)
+
+    for i in range(n):
+        rows.append({
+            "date": times[i],
+            "open": float(opens[i]) if opens[i] is not None else None,
+            "high": float(highs[i]) if highs[i] is not None else None,
+            "low": float(lows[i]) if lows[i] is not None else None,
+            "close": float(closes[i]) if closes[i] is not None else None,
+            "volume": float(volumes[i]) if volumes[i] is not None else 0,
+            "turnover": float(amounts[i]) if amounts[i] is not None else 0,
+            "change_pct": float(change_ratios[i]) if change_ratios[i] is not None else 0,
+        })
+
+    df = pd.DataFrame(rows)
+    df["date"] = pd.to_datetime(df["date"]).dt.date
+    df = df.dropna(subset=["close"])
+
+    if df.empty or len(df) < 2:
+        return None
+
+    if (df["change_pct"] == 0).all():
+        df["change_pct"] = df["close"].pct_change() * 100
+        df["change_pct"] = df["change_pct"].fillna(0)
+
+    return df[["date", "open", "high", "low", "close", "volume", "turnover", "change_pct"]]
+
+
+def fetch_reit_realtime(codes: List[str]) -> Optional[Dict[str, dict]]:
+    """获取C-REITs实时行情
+    Args:
+        codes: REITs代码列表，如 ["508000", "508001"]
+    Returns:
+        {code: {latest, open, high, low, volume, change_ratio, turnover_ratio, ...}}
+    """
+    ifind_codes = [to_ifind_code(c, "REIT") for c in codes]
+
+    indicators = "open,high,low,latest,volume,amount,changeRatio,preClose,change,turnoverRatio"
+
+    data = _post("real_time_quotation", {
+        "codes": ",".join(ifind_codes),
+        "indicators": indicators,
+    }, "REITs实时行情")
+
+    if not data:
+        return None
+
+    result = {}
+    for t in data.get("tables", []):
+        thscode = t.get("thscode", "")
+        tbl = t.get("table", {})
+        internal_code = thscode.split(".")[0]
+
+        item = {
+            "latest": tbl.get("latest", [None])[0],
+            "open": tbl.get("open", [None])[0],
+            "high": tbl.get("high", [None])[0],
+            "low": tbl.get("low", [None])[0],
+            "volume": tbl.get("volume", [None])[0],
+            "amount": tbl.get("amount", [None])[0],
+            "change_ratio": tbl.get("changeRatio", [None])[0],
+            "pre_close": tbl.get("preClose", [None])[0],
+            "change": tbl.get("change", [None])[0],
+            "turnover_ratio": tbl.get("turnoverRatio", [None])[0],
+        }
+
+        result[internal_code] = item
+
+    return result if result else None
+
+
+def fetch_reit_dividend_yield(codes: List[str]) -> Optional[Dict[str, float]]:
+    """获取C-REITs分红率（年化派息率）
+
+    三级降级策略：
+      1. basic_data_service (ths_dividend_rate_fund) — 最优
+      2. date_sequence 日频序列 — 备选
+      3. 历史行情除权缺口估算 — 最终降级
+
+    Args:
+        codes: REITs代码列表
+    Returns:
+        {code: dividend_yield_pct} 如 {"508000": 5.23}
+    """
+    ifind_codes = [to_ifind_code(c, "REIT") for c in codes]
+    today = datetime.now().strftime("%Y%m%d")
+
+    result = {}
+
+    # ── 策略1: basic_data_service ──
+    data = _post("basic_data_service", {
+        "codes": ",".join(ifind_codes),
+        "indipara": [
+            {"indicator": "ths_dividend_rate_fund", "indiparams": [today]},
+        ]
+    }, "REITs分红率")
+
+    if data and data.get("errorcode") == 0:
+        for t in data.get("tables", []):
+            thscode = t.get("thscode", "")
+            tbl = t.get("table", {})
+            internal_code = thscode.split(".")[0]
+            div_rate = tbl.get("ths_dividend_rate_fund", [None])[0]
+            if div_rate is not None:
+                result[internal_code] = round(float(div_rate), 2)
+
+    # ── 策略2: date_sequence 日频 ──
+    if not result:
+        logger.info("REITs分红率: basic_data_service 不可用，尝试 date_sequence")
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+        for code in codes[:5]:  # 只探测前5只，避免大量无效请求
+            ifind_code = to_ifind_code(code, "REIT")
+            ds_data = _post("date_sequence", {
+                "codes": ifind_code,
+                "indicators": "ths_dividend_rate_fund",
+                "startdate": start_date,
+                "enddate": end_date,
+                "functionpara": {"Period": "D"},
+            }, f"REITs分红率序列 {ifind_code}")
+            if ds_data and ds_data.get("errorcode") == 0:
+                tables = ds_data.get("tables", [])
+                if tables:
+                    tbl = tables[0].get("table", {})
+                    vals = tbl.get("ths_dividend_rate_fund", [])
+                    for v in reversed(vals):
+                        if v is not None:
+                            result[code] = round(float(v), 2)
+                            break
+            elif ds_data and ds_data.get("errorcode") == -4210:
+                # 参数错误 = 指标不可用，不再继续尝试
+                logger.info("REITs分红率: date_sequence 指标不可用，切换历史行情估算")
+                break
+
+    # ── 策略3: 历史行情除权缺口估算 ──
+    if not result:
+        logger.info("REITs分红率: iFinD基金指标不可用，使用历史行情除权缺口估算")
+        for code in codes:
+            try:
+                df = fetch_reit_history(code, days=400)
+                if df is None or df.empty or len(df) < 30:
+                    continue
+                # 检测除权日: 前收盘价 - 开盘价 存在明显正向缺口（分红导致）
+                # 分红日特征: 前一日收盘 > 当日开盘（且差值 > 日常波动）
+                closes = df["close"].values
+                opens = df["open"].values
+                total_dividend = 0.0
+                for i in range(1, len(df)):
+                    gap = closes[i - 1] - opens[i]
+                    # 缺口超过前一日收盘的0.5%且为正（排除正常波动）
+                    if gap > closes[i - 1] * 0.005 and gap > 0.01:
+                        total_dividend += gap
+                if total_dividend > 0 and closes[-1] and closes[-1] > 0:
+                    # 年化: 数据跨度占365天的比例
+                    data_days = (df["date"].iloc[-1] - df["date"].iloc[0]).days
+                    if data_days > 0:
+                        annualized = total_dividend * (365 / data_days)
+                        yield_pct = round((annualized / closes[-1]) * 100, 2)
+                        if 0 < yield_pct < 20:  # 合理范围校验
+                            result[code] = yield_pct
+            except Exception as e:
+                logger.debug(f"REITs分红率估算失败 {code}: {e}")
+
+    if result:
+        logger.info(f"REITs分红率: 获取 {len(result)}/{len(codes)} 只")
+    else:
+        logger.warning("REITs分红率: 全部获取失败，筛选将跳过分红率维度")
+
+    return result if result else None
+
+
+def fetch_reit_income_trend(codes: List[str], years: int = 2) -> Optional[Dict[str, list]]:
+    """获取C-REITs收入趋势（用于判断环比下降）
+    通过查询基金的可供分配金额或净收益等
+
+    注意: iFinD FREEIAL 账号可能不支持基金专用指标(ths_fund_income_fund)，
+    此时返回 None，筛选引擎的第2层会自动跳过（全部保留）。
+
+    Args:
+        codes: REITs代码列表
+        years: 回溯年数
+    Returns:
+        {code: [{period, income}, ...]} 按时间升序
+    """
+    ifind_codes = [to_ifind_code(c, "REIT") for c in codes]
+    end_date = datetime.now().strftime("%Y-%m-%d")
+    start_date = (datetime.now() - timedelta(days=years * 365)).strftime("%Y-%m-%d")
+
+    data = _post("date_sequence", {
+        "codes": ",".join(ifind_codes),
+        "indicators": "ths_fund_income_fund",
+        "startdate": start_date,
+        "enddate": end_date,
+        "functionpara": {"Period": "Q"},  # 季度数据
+    }, "REITs收入趋势")
+
+    if not data:
+        logger.warning("REITs收入趋势: iFinD基金收入指标不可用，第2层筛选将跳过")
+        return None
+
+    result = {}
+    for t in data.get("tables", []):
+        thscode = t.get("thscode", "")
+        tbl = t.get("table", {})
+        times = t.get("time", [])
+        internal_code = thscode.split(".")[0]
+
+        incomes = tbl.get("ths_fund_income_fund", [])
+        records = []
+        for i, tm in enumerate(times):
+            val = incomes[i] if i < len(incomes) else None
+            if val is not None:
+                records.append({"period": tm, "income": float(val)})
+
+        if records:
+            result[internal_code] = records
+
+    if result:
+        logger.info(f"REITs收入趋势: 获取 {len(result)}/{len(codes)} 只")
+    else:
+        logger.warning("REITs收入趋势: 无有效数据，第2层筛选将跳过")
+
+    return result if result else None
 
 
 # =====================================================================

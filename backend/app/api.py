@@ -811,8 +811,8 @@ async def get_watchlist_analysis(
     基于最新评级数据 + 近期趋势，由三模型联合生成操作建议。
     """
     import asyncio
-    from app.llm_client import chat_deepseek, chat_glm, chat_kimi
-    from app.config import DEEPSEEK_ENABLED, GLM_ENABLED, KIMI_ENABLED
+    from app.llm_client import chat_minimax, chat_glm, chat_kimi
+    from app.config import MINIMAX_ENABLED, GLM_ENABLED, KIMI_ENABLED
 
     # 获取用户自选股
     wl_result = await db.execute(
@@ -918,9 +918,9 @@ async def get_watchlist_analysis(
 
     tasks = []
     task_labels = []
-    if DEEPSEEK_ENABLED:
-        tasks.append(chat_deepseek(prompt, system=system, temperature=0.3))
-        task_labels.append("DeepSeek")
+    if MINIMAX_ENABLED:
+        tasks.append(chat_minimax(prompt, system=system, temperature=0.3))
+        task_labels.append("MiniMax")
     if GLM_ENABLED:
         tasks.append(chat_glm(prompt, system=system, temperature=0.3))
         task_labels.append("GLM-5")
@@ -1395,8 +1395,8 @@ async def _generate_ai_picks(db: AsyncSession) -> tuple:
     """AI三模型联合生成推荐选股组合"""
     import asyncio
     import re
-    from app.llm_client import chat_deepseek, chat_glm, chat_kimi
-    from app.config import DEEPSEEK_ENABLED, GLM_ENABLED, KIMI_ENABLED
+    from app.llm_client import chat_minimax, chat_glm, chat_kimi
+    from app.config import MINIMAX_ENABLED, GLM_ENABLED, KIMI_ENABLED
 
     # 获取最新评级数据
     summaries = []
@@ -1440,9 +1440,9 @@ async def _generate_ai_picks(db: AsyncSession) -> tuple:
 
     tasks = []
     task_labels = []
-    if DEEPSEEK_ENABLED:
-        tasks.append(chat_deepseek(prompt, system=system, temperature=0.3))
-        task_labels.append("DeepSeek")
+    if MINIMAX_ENABLED:
+        tasks.append(chat_minimax(prompt, system=system, temperature=0.3))
+        task_labels.append("MiniMax")
     if GLM_ENABLED:
         tasks.append(chat_glm(prompt, system=system, temperature=0.3))
         task_labels.append("GLM-5")
@@ -1655,16 +1655,16 @@ async def _generate_digest_with_multi_model(prompt: str) -> dict:
     """三模型并发生成日报，融合结果"""
     import asyncio
     import re
-    from app.llm_client import chat_deepseek, chat_glm, chat_kimi
-    from app.config import DEEPSEEK_ENABLED, GLM_ENABLED, KIMI_ENABLED
+    from app.llm_client import chat_minimax, chat_glm, chat_kimi
+    from app.config import MINIMAX_ENABLED, GLM_ENABLED, KIMI_ENABLED
 
     system = "你是房地产行业资深研究员，擅长撰写专业的投研日报。请直接返回JSON，不要有其他文字。"
 
     tasks = []
     task_labels = []
-    if DEEPSEEK_ENABLED:
-        tasks.append(chat_deepseek(prompt, system=system, temperature=0.4, enable_search=True))
-        task_labels.append("DeepSeek")
+    if MINIMAX_ENABLED:
+        tasks.append(chat_minimax(prompt, system=system, temperature=0.4, enable_search=True))
+        task_labels.append("MiniMax")
     if GLM_ENABLED:
         tasks.append(chat_glm(prompt, system=system, temperature=0.4))
         task_labels.append("GLM-5")
@@ -1906,7 +1906,7 @@ async def _build_ai_picks_digest_prompt(db: AsyncSession) -> str:
         total_ret = (cum_factor - 1) * 100
         perf_note = f"AI推荐组合近30日模拟累计收益率：{total_ret:+.2f}%。"
 
-    return f"""你是一位专业的房地产股票投资顾问。以下是AI智能选股系统（三模型融合：DeepSeek V3.2 + GLM-5 + Kimi K2.5）今日推荐的股票组合（{len(picks_data)}只）：
+    return f"""你是一位专业的房地产股票投资顾问。以下是AI智能选股系统（三模型融合：MiniMax M2.5 + GLM-5 + Kimi K2.5）今日推荐的股票组合（{len(picks_data)}只）：
 
 {perf_note}
 
@@ -2739,3 +2739,374 @@ async def share_report(rid: int, request: Request, db: AsyncSession = Depends(ge
         content_html=content_html,
         request=request,
     )
+
+
+# =====================================================================
+# C-REITs 模块
+# =====================================================================
+
+from app.models import REITItem, REITPrice, REITWeeklyPick, REITBacktest
+from app.reits_list import UNIQUE_CREITS
+from app import reits_engine
+
+
+@router.get("/reits/list")
+async def get_reits_list(
+    sector: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取全部C-REITs列表（含实时行情）"""
+    query = select(REITItem).where(REITItem.is_active == 1)
+    if sector:
+        query = query.where(REITItem.sector == sector)
+    query = query.order_by(REITItem.code)
+
+    result = await db.execute(query)
+    items = result.scalars().all()
+
+    if not items:
+        return []
+
+    # 批量获取实时行情
+    codes = [it.code for it in items]
+    realtime = None
+    try:
+        from app.ifind_client import fetch_reit_realtime
+        realtime = fetch_reit_realtime(codes)
+    except Exception as e:
+        logger.warning(f"REITs实时行情获取失败: {e}")
+
+    # 尝试获取分红率
+    dividend_data = None
+    try:
+        from app.ifind_client import fetch_reit_dividend_yield
+        dividend_data = fetch_reit_dividend_yield(codes)
+    except Exception as e:
+        logger.debug(f"REITs分红率获取失败: {e}")
+
+    out = []
+    for it in items:
+        item_dict = {
+            "id": it.id,
+            "code": it.code,
+            "name": it.name,
+            "sector": it.sector,
+            "is_active": it.is_active,
+            "latest_price": None,
+            "change_pct": None,
+            "dividend_yield": None,
+            "turnover_ratio": None,
+            "volume": None,
+        }
+
+        if realtime and it.code in realtime:
+            rt = realtime[it.code]
+            item_dict["latest_price"] = rt.get("latest")
+            item_dict["change_pct"] = rt.get("change_ratio")
+            item_dict["turnover_ratio"] = rt.get("turnover_ratio")
+            item_dict["volume"] = rt.get("volume")
+
+        if dividend_data and it.code in dividend_data:
+            item_dict["dividend_yield"] = dividend_data[it.code]
+
+        out.append(item_dict)
+
+    return out
+
+
+@router.get("/reits/sectors")
+async def get_reits_sectors(db: AsyncSession = Depends(get_db)):
+    """获取REITs类型分布"""
+    result = await db.execute(
+        select(REITItem.sector, func.count(REITItem.id))
+        .where(REITItem.is_active == 1)
+        .group_by(REITItem.sector)
+    )
+    sectors = {}
+    for row in result.all():
+        sectors[row[0] or "其他"] = row[1]
+    return sectors
+
+
+@router.get("/reits/weekly-picks")
+async def get_reits_weekly_picks(
+    force: bool = False,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取本周REITs推荐（不存在则自动生成）"""
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=4)
+
+    if not force:
+        existing = await db.execute(
+            select(REITWeeklyPick).where(REITWeeklyPick.week_start == week_start)
+        )
+        pick = existing.scalar_one_or_none()
+        if pick:
+            return _format_weekly_pick(pick)
+
+    # 生成本周推荐
+    result = await _generate_reit_weekly_picks(db)
+    if result:
+        return result
+
+    return {"message": "暂无推荐数据，请稍后重试", "picks": []}
+
+
+@router.post("/reits/generate-picks")
+async def generate_reits_picks(db: AsyncSession = Depends(get_db)):
+    """手动触发REITs推荐生成（管理员）"""
+    result = await _generate_reit_weekly_picks(db)
+    if result:
+        return result
+    raise HTTPException(status_code=500, detail="REITs推荐生成失败")
+
+
+@router.get("/reits/weekly-picks/history")
+async def get_reits_picks_history(
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取历史周推荐列表"""
+    result = await db.execute(
+        select(REITWeeklyPick)
+        .order_by(REITWeeklyPick.week_start.desc())
+        .limit(limit)
+    )
+    picks = result.scalars().all()
+    return [_format_weekly_pick(p) for p in picks]
+
+
+@router.get("/reits/backtest")
+async def get_reits_backtest(
+    week_start: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """获取回测结果"""
+    if week_start:
+        target_date = date.fromisoformat(week_start)
+    else:
+        # 查找最近有回测数据的一期
+        latest = await db.execute(
+            select(REITBacktest.week_start)
+            .distinct()
+            .order_by(REITBacktest.week_start.desc())
+            .limit(1)
+        )
+        row = latest.scalar_one_or_none()
+        if not row:
+            return {"message": "暂无回测数据", "items": []}
+        target_date = row
+
+    result = await db.execute(
+        select(REITBacktest).where(REITBacktest.week_start == target_date)
+    )
+    backtests = result.scalars().all()
+
+    items = []
+    sum_1m, sum_3m, sum_6m = 0, 0, 0
+    count_1m, count_3m, count_6m = 0, 0, 0
+
+    for bt in backtests:
+        items.append({
+            "code": bt.code,
+            "name": bt.name,
+            "pick_price": bt.pick_price,
+            "return_1m": bt.return_1m,
+            "return_3m": bt.return_3m,
+            "return_6m": bt.return_6m,
+            "evaluation": bt.evaluation,
+        })
+        if bt.return_1m is not None:
+            sum_1m += bt.return_1m
+            count_1m += 1
+        if bt.return_3m is not None:
+            sum_3m += bt.return_3m
+            count_3m += 1
+        if bt.return_6m is not None:
+            sum_6m += bt.return_6m
+            count_6m += 1
+
+    return {
+        "week_start": str(target_date),
+        "items": items,
+        "avg_return_1m": round(sum_1m / count_1m, 2) if count_1m else None,
+        "avg_return_3m": round(sum_3m / count_3m, 2) if count_3m else None,
+        "avg_return_6m": round(sum_6m / count_6m, 2) if count_6m else None,
+    }
+
+
+@router.get("/reits/price-history/{code}")
+async def get_reits_price_history(code: str, days: int = 90):
+    """获取单只REITs的历史价格"""
+    from app.ifind_client import fetch_reit_history
+    df = fetch_reit_history(code, days=days)
+    if df is None or df.empty:
+        return []
+
+    return [
+        {
+            "date": str(row["date"]),
+            "open": row.get("open"),
+            "high": row.get("high"),
+            "low": row.get("low"),
+            "close": row.get("close"),
+            "volume": row.get("volume"),
+            "change_pct": row.get("change_pct"),
+        }
+        for _, row in df.iterrows()
+    ]
+
+
+# ── REITs 内部辅助函数 ──
+
+def _format_weekly_pick(pick: REITWeeklyPick) -> dict:
+    """格式化周推荐记录"""
+    import json
+    picks_list = []
+    try:
+        picks_list = json.loads(pick.picks_json)
+    except Exception:
+        pass
+
+    filter_log = None
+    try:
+        if pick.filter_log:
+            filter_log = json.loads(pick.filter_log)
+    except Exception:
+        pass
+
+    return {
+        "id": pick.id,
+        "week_start": str(pick.week_start),
+        "week_end": str(pick.week_end),
+        "picks": picks_list,
+        "filter_log": filter_log,
+        "model_source": pick.model_source,
+        "created_at": str(pick.created_at) if pick.created_at else None,
+    }
+
+
+async def _generate_reit_weekly_picks(db: AsyncSession) -> Optional[dict]:
+    """生成本周REITs推荐"""
+    import json
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=4)
+
+    # 获取活跃REITs
+    result = await db.execute(
+        select(REITItem).where(REITItem.is_active == 1)
+    )
+    all_reits = result.scalars().all()
+    if not all_reits:
+        logger.warning("无活跃REITs，无法生成推荐")
+        return None
+
+    reit_dicts = [{"code": r.code, "name": r.name, "sector": r.sector} for r in all_reits]
+
+    try:
+        # 运行完整筛选流水线
+        screening = await reits_engine.run_full_screening(reit_dicts, top_n=5)
+
+        picks = screening.get("picks", [])
+        filter_log = screening.get("filter_log", {})
+        model_source = screening.get("model_source", "MiniMax M2.5 + GLM-5 + Kimi K2.5")
+
+        if not picks:
+            logger.warning("REITs筛选无结果")
+            return None
+
+        # 保存到数据库
+        # 先删除本周已有的推荐
+        await db.execute(
+            delete(REITWeeklyPick).where(REITWeeklyPick.week_start == week_start)
+        )
+
+        pick_record = REITWeeklyPick(
+            week_start=week_start,
+            week_end=week_end,
+            picks_json=json.dumps(picks, ensure_ascii=False),
+            filter_log=json.dumps(filter_log, ensure_ascii=False),
+            model_source=model_source,
+        )
+        db.add(pick_record)
+        await db.commit()
+        await db.refresh(pick_record)
+
+        logger.info(f"REITs本周推荐已生成: {[p['code'] for p in picks]}")
+        return _format_weekly_pick(pick_record)
+
+    except Exception as e:
+        logger.error(f"REITs推荐生成异常: {e}")
+        await db.rollback()
+        return None
+
+
+async def _update_reit_backtests(db: AsyncSession):
+    """更新所有历史推荐的回测数据"""
+    import json
+    from app.ifind_client import fetch_reit_history
+
+    # 获取所有历史推荐
+    result = await db.execute(
+        select(REITWeeklyPick).order_by(REITWeeklyPick.week_start.desc()).limit(20)
+    )
+    all_picks = result.scalars().all()
+
+    for pick in all_picks:
+        try:
+            picks_list = json.loads(pick.picks_json)
+        except Exception:
+            continue
+
+        for p in picks_list:
+            code = p.get("code", "")
+            name = p.get("name", "")
+
+            # 获取180天历史
+            df = fetch_reit_history(code, days=240)
+            if df is None:
+                continue
+
+            returns = reits_engine.calculate_returns(code, pick.week_start, df)
+
+            # 尝试获取推荐时价格
+            pick_price = None
+            try:
+                pick_rows = df[df["date"] >= pick.week_start]
+                if not pick_rows.empty:
+                    pick_price = pick_rows.iloc[0]["close"]
+            except Exception:
+                pass
+
+            # Upsert 回测记录
+            existing = await db.execute(
+                select(REITBacktest).where(
+                    REITBacktest.week_start == pick.week_start,
+                    REITBacktest.code == code,
+                )
+            )
+            bt = existing.scalar_one_or_none()
+
+            if bt:
+                bt.pick_price = pick_price
+                bt.return_1m = returns.get("return_1m")
+                bt.return_3m = returns.get("return_3m")
+                bt.return_6m = returns.get("return_6m")
+            else:
+                bt = REITBacktest(
+                    week_start=pick.week_start,
+                    code=code,
+                    name=name,
+                    pick_price=pick_price,
+                    return_1m=returns.get("return_1m"),
+                    return_3m=returns.get("return_3m"),
+                    return_6m=returns.get("return_6m"),
+                )
+                db.add(bt)
+
+        await db.commit()
+
+    logger.info("REITs回测数据更新完成")

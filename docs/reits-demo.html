@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Haoxing@东吴地产 - REITs模块</title>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: #fafafa;
+  --bg-card: #ffffff;
+  --bg-hover: #f5f5f5;
+  --bg-secondary: #f9fafb;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6b7280;
+  --text-muted: #9ca3af;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --accent: #2563eb;
+  --accent-light: #eff6ff;
+  --green: #059669;
+  --green-bg: #ecfdf5;
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --orange: #d97706;
+  --orange-bg: #fffbeb;
+  --purple: #7c3aed;
+  --purple-bg: #f5f3ff;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 6px rgba(0,0,0,0.04), 0 2px 4px rgba(0,0,0,0.06);
+  --transition: all 0.2s ease;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  color: var(--text-primary);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+body { min-height: 100vh; }
+
+.container { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
+
+/* Header */
+.header {
+  background: rgba(255,255,255,0.9);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 0;
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(12px);
+}
+.header-inner { display: flex; align-items: center; justify-content: space-between; }
+.logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.logo-icon {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 16px;
+}
+.nav-tabs { display: flex; gap: 4px; background: var(--bg); border-radius: 10px; padding: 3px; }
+.nav-tab {
+  padding: 7px 18px; border: none; background: transparent;
+  font-size: 13px; font-weight: 600; color: var(--text-secondary);
+  cursor: pointer; border-radius: 8px; transition: var(--transition); white-space: nowrap;
+}
+.nav-tab.active { background: var(--bg-card); color: var(--accent); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.user-info { font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+.admin-badge { font-size: 11px; font-weight: 600; background: var(--purple-bg); color: var(--purple); padding: 2px 8px; border-radius: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+
+/* Sub tabs */
+.sub-tabs {
+  display: flex; gap: 0; border-radius: 8px; overflow: hidden;
+  border: 1px solid var(--border); margin-bottom: 20px; width: fit-content;
+}
+.sub-tab {
+  padding: 8px 20px; border: none; background: transparent;
+  color: var(--text-secondary); font-weight: 400; cursor: pointer; font-size: 13px; transition: var(--transition);
+}
+.sub-tab.active { background: var(--primary); color: #fff; font-weight: 600; }
+
+/* Card */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+}
+
+/* Methodology */
+.methodology-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 20px; overflow: hidden; }
+.methodology-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; cursor: pointer; }
+.methodology-title-row { display: flex; align-items: center; gap: 8px; }
+.methodology-icon { font-size: 16px; }
+.methodology-title { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.methodology-powered { margin-left: auto; font-size: 11px; font-weight: 500; color: var(--text-muted); background: linear-gradient(135deg, rgba(245,34,45,0.08), rgba(250,84,28,0.08)); padding: 2px 10px; border-radius: 10px; border: 1px solid rgba(245,34,45,0.15); }
+.methodology-arrow { font-size: 10px; color: var(--text-muted); transition: transform 0.25s ease; }
+.methodology-arrow.expanded { transform: rotate(90deg); }
+.methodology-body { padding: 0 20px 24px; }
+.methodology-formula { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 16px 20px; background: linear-gradient(135deg, #f8fafc, #eef2ff); border-radius: var(--radius-sm); border: 1px solid #e0e7ff; margin-bottom: 8px; }
+.formula-label { font-size: 15px; font-weight: 700; }
+.formula-eq { font-size: 15px; font-weight: 600; color: var(--text-muted); }
+.formula-part { font-size: 14px; font-weight: 600; padding: 4px 12px; border-radius: 6px; }
+.formula-part.ai { background: var(--purple-bg); color: var(--purple); }
+.formula-plus { font-size: 15px; font-weight: 600; color: var(--text-muted); }
+.methodology-fallback { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; padding-left: 4px; }
+.methodology-columns { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 20px; }
+.methodology-col { background: var(--bg); border-radius: var(--radius-sm); padding: 16px; }
+.methodology-col-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.col-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ai-dot { background: var(--purple); }
+.methodology-col-desc { font-size: 12px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5; }
+.dimension-list { display: flex; flex-direction: column; gap: 10px; }
+.dimension-item { padding: 8px 10px; background: var(--bg-card); border-radius: 6px; border: 1px solid #f0f0f0; }
+.dimension-name { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+.dimension-weight { font-size: 11px; font-weight: 500; color: var(--accent); background: var(--accent-light); padding: 1px 6px; border-radius: 4px; }
+.dimension-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.ifind-badge-sm { display: inline-block; padding: 1px 6px; margin-left: 6px; font-size: 9px; font-weight: 600; color: #fff; background: linear-gradient(135deg, #f5222d, #fa541c); border-radius: 8px; vertical-align: middle; line-height: 1.5; }
+
+/* Stats cards */
+.stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat-card { padding: 12px 16px; text-align: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.stat-value { font-size: 24px; font-weight: 700; }
+.stat-label { font-size: 12px; color: var(--text-muted); }
+
+/* Filters */
+.filters { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.filter-chip { padding: 6px 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--bg-card); color: var(--text-secondary); font-size: 13px; cursor: pointer; transition: var(--transition); }
+.filter-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* Table */
+.rating-table { width: 100%; border-collapse: collapse; }
+.rating-table th {
+  padding: 12px 16px; text-align: left; font-size: 11px; font-weight: 600;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border); background: var(--bg); white-space: nowrap; cursor: pointer;
+}
+.rating-table td { padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 13px; white-space: nowrap; }
+.rating-table tr:last-child td { border-bottom: none; }
+.rating-table tr:hover td { background: var(--bg-hover); }
+
+/* Sector tags */
+.sector-tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+
+/* Picks */
+.pick-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 16px; border-radius: 8px; border: 1px solid #e5e7eb;
+}
+.pick-card.top { background: #fef3c7; border-color: #fbbf24; }
+.pick-card.normal { background: #fafafa; }
+.pick-rank {
+  width: 28px; height: 28px; border-radius: 50%;
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; flex-shrink: 0;
+}
+
+/* Funnel */
+.funnel { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; margin-bottom: 16px; }
+.funnel-step { display: flex; flex-direction: column; align-items: center; padding: 4px 8px; border-radius: 6px; }
+.funnel-val { font-size: 16px; font-weight: 700; }
+.funnel-label { font-size: 11px; }
+.funnel-arrow { align-self: center; color: #d1d5db; }
+
+/* Footer */
+.footer { text-align: center; padding: 32px 0; color: var(--text-muted); font-size: 12px; border-top: 1px solid var(--border); margin-top: 40px; }
+</style>
+</head>
+<body>
+
+<!-- ===== Header ===== -->
+<header class="header">
+  <div class="container header-inner">
+    <div class="logo">
+      <div class="logo-icon">AI</div>
+      <span>AI Haoxing@东吴地产</span>
+    </div>
+    <nav class="nav-tabs">
+      <button class="nav-tab">AI评级</button>
+      <button class="nav-tab">自选股</button>
+      <button class="nav-tab active">REITs</button>
+      <button class="nav-tab">市场点评</button>
+      <button class="nav-tab">研究报告</button>
+    </nav>
+    <div class="header-actions">
+      <span class="user-info">
+        刘丹阳
+        <span class="admin-badge">管理员</span>
+      </span>
+      <button class="btn btn-sm">退出</button>
+    </div>
+  </div>
+</header>
+
+<main class="container" style="padding-bottom: 40px; padding-top: 24px;">
+
+<!-- ===== Sub Tabs ===== -->
+<div class="sub-tabs" id="subTabs">
+  <button class="sub-tab active" data-tab="pool">REITs自选池 (82)</button>
+  <button class="sub-tab" data-tab="picks">每周推荐</button>
+  <button class="sub-tab" data-tab="backtest">回测评价</button>
+</div>
+
+<!-- ===== Methodology Panel (collapsed by default) ===== -->
+<div class="methodology-card" id="methodCard">
+  <div class="methodology-header" id="methodToggle">
+    <div class="methodology-title-row">
+      <span class="methodology-icon">🏢</span>
+      <span class="methodology-title">C-REITs 智能筛选模型说明</span>
+      <span class="methodology-powered">Powered by 同花顺iFinD · 腾讯云三模型AI</span>
+    </div>
+    <span class="methodology-arrow" id="methodArrow">▶</span>
+  </div>
+  <div class="methodology-body" id="methodBody" style="display:none;">
+    <!-- Formula -->
+    <div class="methodology-formula">
+      <span class="formula-label">5层漏斗筛选</span>
+      <span class="formula-eq">:</span>
+      <span class="formula-part" style="color:#059669;">分红率</span>
+      <span class="formula-plus">→</span>
+      <span class="formula-part" style="color:#0284c7;">收入趋势</span>
+      <span class="formula-plus">→</span>
+      <span class="formula-part" style="color:#7c3aed;">流动性</span>
+      <span class="formula-plus">→</span>
+      <span class="formula-part" style="color:#db2777;">AI舆情</span>
+      <span class="formula-plus">→</span>
+      <span class="formula-part ai">AI综合评选</span>
+    </div>
+    <div class="methodology-fallback">
+      82只C-REITs全覆盖 → 5层逐步过滤 → 最终推荐Top 5；三模型(MiniMax M2.5+GLM-5+Kimi K2.5)投票决策；每周日凌晨1点自动运行
+    </div>
+    <!-- 4 columns -->
+    <div class="methodology-columns">
+      <div class="methodology-col">
+        <div class="methodology-col-title">
+          <span class="col-dot" style="background:#059669;"></span>
+          第1-2层: 基本面筛选
+          <span class="ifind-badge-sm">iFinD</span>
+        </div>
+        <div class="methodology-col-desc">基于iFinD数据，从分红率和收入趋势两个维度进行硬性筛选</div>
+        <div class="dimension-list">
+          <div class="dimension-item">
+            <div class="dimension-name">分红率筛选 <span class="dimension-weight">第1层</span></div>
+            <div class="dimension-desc">硬性范围3-10%，优选5-8%区间。分红率过低说明底层资产收益不佳，过高可能暗示价格暴跌</div>
+          </div>
+          <div class="dimension-item">
+            <div class="dimension-name">三级降级策略 <span class="dimension-weight">数据源</span></div>
+            <div class="dimension-desc">① iFinD基金指标 → ② 日频序列 → ③ 历史行情除权缺口估算</div>
+          </div>
+          <div class="dimension-item">
+            <div class="dimension-name">收入环比剔除 <span class="dimension-weight">第2层</span></div>
+            <div class="dimension-desc">取最近4个季度收入数据，若≥75%季度环比下降则剔除</div>
+          </div>
+        </div>
+      </div>
+      <div class="methodology-col">
+        <div class="methodology-col-title">
+          <span class="col-dot" style="background:#7c3aed;"></span>
+          第3层: 流动性筛选
+          <span class="ifind-badge-sm">iFinD</span>
+        </div>
+        <div class="methodology-col-desc">基于iFinD历史行情数据，8线程并发获取，筛除流动性不足的品种</div>
+        <div class="dimension-list">
+          <div class="dimension-item">
+            <div class="dimension-name">零换手率剔除 <span class="dimension-weight">核心</span></div>
+            <div class="dimension-desc">检查最近10个交易日的成交量，全部为0则剔除</div>
+          </div>
+          <div class="dimension-item">
+            <div class="dimension-name">市场数据提取 <span class="dimension-weight">增强</span></div>
+            <div class="dimension-desc">同时提取日均换手率、5/20日涨跌幅、30日价格区间等指标</div>
+          </div>
+        </div>
+      </div>
+      <div class="methodology-col">
+        <div class="methodology-col-title">
+          <span class="col-dot" style="background:#db2777;"></span>
+          第4层: AI舆情分析
+        </div>
+        <div class="methodology-col-desc">三大模型并发分析REITs负面舆情，投票决策</div>
+        <div class="dimension-list">
+          <div class="dimension-item">
+            <div class="dimension-name">负面事件检测 <span class="dimension-weight">5类</span></div>
+            <div class="dimension-desc">底层资产问题 · 管理人违规 · 分配下降 · 诉讼查封 · 重大利空</div>
+          </div>
+          <div class="dimension-item">
+            <div class="dimension-name">三模型投票 <span class="dimension-weight">机制</span></div>
+            <div class="dimension-desc">MiniMax M2.5 + GLM-5 + Kimi K2.5各自独立判断，超半数认为负面才剔除</div>
+          </div>
+          <div class="dimension-item">
+            <div class="dimension-name">保守策略 <span class="dimension-weight">原则</span></div>
+            <div class="dimension-desc">宁可错留、不可错杀。单一模型幻觉不会导致误判</div>
+          </div>
+        </div>
+      </div>
+      <div class="methodology-col">
+        <div class="methodology-col-title">
+          <span class="col-dot ai-dot"></span>
+          第5层: AI综合评选
+        </div>
+        <div class="methodology-col-desc">三模型独立推荐+加权融合+共识加分，输出最终Top 5</div>
+        <div class="dimension-list">
+          <div class="dimension-item">
+            <div class="dimension-name">5维选择标准 <span class="dimension-weight">权重</span></div>
+            <div class="dimension-desc">分红率稳健30% · 类型多元化25% · 流动性15% · 近期走势15% · 底层资产质量15%</div>
+          </div>
+          <div class="dimension-item">
+            <div class="dimension-name">加权融合评分 <span class="dimension-weight">算法</span></div>
+            <div class="dimension-desc">模型评分×75% + 排名加分×25%，按MiniMax(40%)/GLM(30%)/Kimi(30%)加权</div>
+          </div>
+          <div class="dimension-item">
+            <div class="dimension-name">共识加分 <span class="dimension-weight">机制</span></div>
+            <div class="dimension-desc">2个模型同时推荐+10%，3个模型全票推荐+20%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Backtest note -->
+    <div style="padding:12px 16px;background:var(--bg-secondary);border-radius:8px;border:1px solid var(--border);margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;">📈 回测评价机制</div>
+      <div style="font-size:12px;color:var(--text-secondary);line-height:1.6;">
+        每期推荐自动计算1/3/6个月收益率（推荐日买入收盘价，目标日最近交易日收盘价）。三模型联合生成回测评价，从收益表现、稳定性、持有期特征和改进建议四个维度进行分析。
+      </div>
+    </div>
+    <!-- Degradation note -->
+    <div style="padding:12px 16px;background:#fffbeb;border-radius:8px;border:1px solid #fde68a;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;color:#92400e;">🛡️ 降级保障机制</div>
+      <div style="font-size:12px;color:#a16207;line-height:1.6;">
+        <strong>数据降级</strong>：分红率获取支持三级降级（iFinD指标→日频序列→历史行情估算），确保数据可用性。<br>
+        <strong>AI降级</strong>：若所有模型调用失败，自动切换为分红率+类型多元化的量化排序选择，保证推荐输出。<br>
+        <strong>筛选降级</strong>：各层数据不可用时自动跳过（全部保留），不会因数据缺失导致误杀。
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB: 自选池 ==================== -->
+<div id="tab-pool">
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-value" style="color:var(--primary);">82</div><div class="stat-label">总只数</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:#10b981;">37</div><div class="stat-label">有行情</div></div>
+    <div class="stat-card"><div class="stat-value">16</div><div class="stat-label">产业园</div></div>
+    <div class="stat-card"><div class="stat-value">12</div><div class="stat-label">仓储物流</div></div>
+    <div class="stat-card"><div class="stat-value">11</div><div class="stat-label">保障性住房</div></div>
+    <div class="stat-card"><div class="stat-value">10</div><div class="stat-label">能源</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <button class="filter-chip active">全部类型</button>
+    <button class="filter-chip">产业园</button>
+    <button class="filter-chip">仓储物流</button>
+    <button class="filter-chip">保障性住房</button>
+    <button class="filter-chip">消费基础设施</button>
+    <button class="filter-chip">能源</button>
+    <button class="filter-chip">交通</button>
+    <button class="filter-chip">生态环保</button>
+    <button class="filter-chip">数据中心</button>
+  </div>
+
+  <!-- Table -->
+  <div class="card" style="overflow-x:auto;">
+    <table class="rating-table">
+      <thead>
+        <tr>
+          <th>代码</th><th>名称</th><th>类型</th><th>最新价</th>
+          <th>涨跌幅</th><th>分红率% ▼</th><th>换手率%</th><th>成交量</th>
+        </tr>
+      </thead>
+      <tbody id="poolBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ==================== TAB: 每周推荐 ==================== -->
+<div id="tab-picks" style="display:none;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <h3 style="margin:0;font-size:16px;">📊 C-REITs 每周精选 · 5只推荐</h3>
+    <button class="btn btn-sm" style="background:#eff6ff;color:#1d4ed8;border:1px solid #93c5fd;">重新生成推荐</button>
+  </div>
+
+  <!-- Strategy card -->
+  <div class="card" style="padding:16px;margin-bottom:16px;background:#f0fdf4;border-color:#bbf7d0;">
+    <div style="font-size:13px;font-weight:600;margin-bottom:8px;color:#166534;">🔍 5层智能筛选策略</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#15803d;">
+      <span>① 分红率 5-8% 优选</span>
+      <span>② 剔除收入环比下降</span>
+      <span>③ 剔除零换手率</span>
+      <span>④ 剔除负面舆情</span>
+      <span>⑤ AI综合评选Top 5</span>
+    </div>
+  </div>
+
+  <!-- This week -->
+  <div class="card" style="padding:16px;margin-bottom:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <span style="font-size:14px;font-weight:600;">本周推荐 (2026-03-30 ~ 2026-04-05)</span>
+      <span style="font-size:12px;color:var(--text-muted);">模型: MiniMax M2.5 + GLM-5 + Kimi K2.5</span>
+    </div>
+
+    <!-- Funnel -->
+    <div class="funnel">
+      <div class="funnel-step" style="background:rgba(107,114,128,0.06);"><span class="funnel-val" style="color:#6b7280;">82</span><span class="funnel-label" style="color:#6b7280;">总池</span></div>
+      <span class="funnel-arrow">→</span>
+      <div class="funnel-step" style="background:rgba(5,150,105,0.06);"><span class="funnel-val" style="color:#059669;">30</span><span class="funnel-label" style="color:#059669;">分红率</span></div>
+      <span class="funnel-arrow">→</span>
+      <div class="funnel-step" style="background:rgba(2,132,199,0.06);"><span class="funnel-val" style="color:#0284c7;">26</span><span class="funnel-label" style="color:#0284c7;">收入</span></div>
+      <span class="funnel-arrow">→</span>
+      <div class="funnel-step" style="background:rgba(124,58,237,0.06);"><span class="funnel-val" style="color:#7c3aed;">24</span><span class="funnel-label" style="color:#7c3aed;">换手率</span></div>
+      <span class="funnel-arrow">→</span>
+      <div class="funnel-step" style="background:rgba(219,39,119,0.06);"><span class="funnel-val" style="color:#db2777;">22</span><span class="funnel-label" style="color:#db2777;">舆情</span></div>
+      <span class="funnel-arrow">→</span>
+      <div class="funnel-step" style="background:rgba(220,38,38,0.06);"><span class="funnel-val" style="color:#dc2626;">5</span><span class="funnel-label" style="color:#dc2626;">推荐</span></div>
+    </div>
+
+    <!-- Picks list -->
+    <div style="display:grid;gap:10px;" id="picksList"></div>
+  </div>
+
+  <!-- History -->
+  <div class="card" style="padding:16px;">
+    <div style="font-size:14px;font-weight:600;display:flex;justify-content:space-between;">
+      <span>📅 历史推荐记录 (8期)</span>
+      <span style="color:var(--text-muted);font-size:12px;">展开 ▼</span>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB: 回测评价 ==================== -->
+<div id="tab-backtest" style="display:none;">
+  <h3 style="margin:0 0 16px;font-size:16px;">📈 REITs推荐回测评价</h3>
+
+  <!-- Summary cards -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+    <div class="card" style="padding:16px;text-align:center;">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">平均收益 · 1个月</div>
+      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#dc2626;">+1.23%</div>
+    </div>
+    <div class="card" style="padding:16px;text-align:center;">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">平均收益 · 3个月</div>
+      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#dc2626;">+3.58%</div>
+    </div>
+    <div class="card" style="padding:16px;text-align:center;">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;">平均收益 · 6个月</div>
+      <div style="font-size:24px;font-weight:700;font-family:monospace;color:#dc2626;">+5.82%</div>
+    </div>
+  </div>
+
+  <!-- Detail table -->
+  <div class="card" style="padding:16px;">
+    <div style="font-size:14px;font-weight:600;margin-bottom:12px;">推荐期: 2026-03-30</div>
+    <table class="rating-table">
+      <thead>
+        <tr><th>代码</th><th>名称</th><th>推荐价</th><th>1个月</th><th>3个月</th><th>6个月</th></tr>
+      </thead>
+      <tbody id="backtestBody"></tbody>
+    </table>
+  </div>
+</div>
+
+</main>
+
+<footer class="footer">
+  <div class="container">AI评级仅供参考, 不构成投资建议。投资有风险, 入市需谨慎。</div>
+</footer>
+
+<script>
+// ===== Mock Data =====
+const SECTOR_COLORS = {
+  '产业园': { bg: '#dbeafe', color: '#1e40af', border: '#93c5fd' },
+  '仓储物流': { bg: '#dcfce7', color: '#166534', border: '#86efac' },
+  '保障性住房': { bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
+  '消费基础设施': { bg: '#fce7f3', color: '#9d174d', border: '#f9a8d4' },
+  '能源': { bg: '#ffedd5', color: '#9a3412', border: '#fdba74' },
+  '交通': { bg: '#e0e7ff', color: '#3730a3', border: '#a5b4fc' },
+  '生态环保': { bg: '#d1fae5', color: '#065f46', border: '#6ee7b7' },
+  '数据中心': { bg: '#ede9fe', color: '#5b21b6', border: '#c4b5fd' },
+};
+
+const mockReits = [
+  { code: '180201', name: '华安张江光大REIT', sector: '产业园', latest_price: 2.458, change_pct: 1.23, dividend_yield: 6.58, turnover_ratio: 0.35, volume: 12560000 },
+  { code: '508000', name: '华安张江光大园REIT', sector: '产业园', latest_price: 3.012, change_pct: -0.45, dividend_yield: 5.92, turnover_ratio: 0.28, volume: 8930000 },
+  { code: '180301', name: '中金普洛斯REIT', sector: '仓储物流', latest_price: 3.156, change_pct: 0.85, dividend_yield: 5.47, turnover_ratio: 0.52, volume: 23400000 },
+  { code: '508006', name: '国泰君安东久新经济REIT', sector: '仓储物流', latest_price: 2.789, change_pct: -1.12, dividend_yield: 7.35, turnover_ratio: 0.41, volume: 15670000 },
+  { code: '508018', name: '中金普洛斯仓储REIT', sector: '仓储物流', latest_price: 2.234, change_pct: 0.32, dividend_yield: 4.72, turnover_ratio: 0.18, volume: 6780000 },
+  { code: '508028', name: '中信建投国家电投新能源REIT', sector: '能源', latest_price: 4.567, change_pct: 2.15, dividend_yield: 5.68, turnover_ratio: 0.63, volume: 34500000 },
+  { code: '508058', name: '鹏华深圳能源REIT', sector: '能源', latest_price: 3.891, change_pct: 0.56, dividend_yield: 5.41, turnover_ratio: 0.45, volume: 19800000 },
+  { code: '508056', name: '中航首钢绿能REIT', sector: '生态环保', latest_price: 5.123, change_pct: -0.28, dividend_yield: 4.73, turnover_ratio: 0.22, volume: 9120000 },
+  { code: '180401', name: '东吴苏园产业REIT', sector: '产业园', latest_price: 2.876, change_pct: 0.67, dividend_yield: 6.12, turnover_ratio: 0.31, volume: 11230000 },
+  { code: '508099', name: '建信中关村产业园REIT', sector: '产业园', latest_price: 2.345, change_pct: -0.89, dividend_yield: 5.34, turnover_ratio: 0.19, volume: 5670000 },
+  { code: '508027', name: '东吴苏州工业园REIT', sector: '产业园', latest_price: 3.456, change_pct: 1.45, dividend_yield: 5.89, turnover_ratio: 0.38, volume: 14560000 },
+  { code: '508021', name: '国泰君安临港新片区REIT', sector: '产业园', latest_price: 2.678, change_pct: 0.12, dividend_yield: 4.56, turnover_ratio: 0.25, volume: 8900000 },
+  { code: '508088', name: '嘉实京东仓储REIT', sector: '仓储物流', latest_price: 3.234, change_pct: -0.67, dividend_yield: 6.23, turnover_ratio: 0.47, volume: 21000000 },
+  { code: '508098', name: '华夏北京保障房REIT', sector: '保障性住房', latest_price: 2.567, change_pct: 0.34, dividend_yield: 4.89, turnover_ratio: 0.15, volume: 4560000 },
+  { code: '508068', name: '华夏基金华润有巢REIT', sector: '保障性住房', latest_price: 2.123, change_pct: -0.23, dividend_yield: 3.78, turnover_ratio: 0.12, volume: 3450000 },
+  { code: '508001', name: '国金铁建重庆渝遂REIT', sector: '交通', latest_price: 4.789, change_pct: 0.78, dividend_yield: 7.12, turnover_ratio: 0.33, volume: 12340000 },
+  { code: '508066', name: '华泰紫金南京建邺REIT', sector: '消费基础设施', latest_price: 3.567, change_pct: 1.89, dividend_yield: 5.45, turnover_ratio: 0.29, volume: 10560000 },
+];
+
+function sectorTag(sector) {
+  const c = SECTOR_COLORS[sector] || { bg: '#f3f4f6', color: '#4b5563', border: '#d1d5db' };
+  return `<span class="sector-tag" style="background:${c.bg};color:${c.color};border:1px solid ${c.border};">${sector}</span>`;
+}
+
+function changeTag(val) {
+  if (val == null) return '<span style="color:#9ca3af;">--</span>';
+  const color = val > 0 ? '#dc2626' : val < 0 ? '#16a34a' : '#6b7280';
+  return `<span style="color:${color};font-weight:500;font-family:monospace;">${val > 0 ? '+' : ''}${val.toFixed(2)}%</span>`;
+}
+
+function fmtVol(v) {
+  if (v > 1e8) return (v / 1e8).toFixed(1) + '亿';
+  if (v > 1e4) return (v / 1e4).toFixed(0) + '万';
+  return v.toFixed(0);
+}
+
+// Render pool table
+document.getElementById('poolBody').innerHTML = mockReits.map(r => `
+  <tr>
+    <td style="font-family:monospace;font-weight:500;">${r.code}</td>
+    <td style="font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.name}</td>
+    <td>${sectorTag(r.sector)}</td>
+    <td style="font-family:monospace;">${r.latest_price.toFixed(3)}</td>
+    <td>${changeTag(r.change_pct)}</td>
+    <td style="font-family:monospace;${r.dividend_yield >= 5 && r.dividend_yield <= 8 ? 'color:#16a34a;font-weight:600;' : ''}">${r.dividend_yield.toFixed(2)}</td>
+    <td style="font-family:monospace;">${r.turnover_ratio.toFixed(2)}</td>
+    <td style="font-family:monospace;font-size:12px;">${fmtVol(r.volume)}</td>
+  </tr>
+`).join('');
+
+// Render picks
+const picks = [
+  { code: '508028', name: '中信建投国家电投新能源REIT', sector: '能源', dividend_yield: 5.68, reason: '[全票推荐] 分红率5.68%位于优选区间，清洁能源赛道长期确定性强，近20日涨跌+2.15%，流动性充裕' },
+  { code: '180201', name: '华安张江光大REIT', sector: '产业园', dividend_yield: 6.58, reason: '分红率6.58%处于甜蜜区间，张江科学城产业集聚效应显著，底层资产出租率稳定在95%以上' },
+  { code: '508006', name: '国泰君安东久新经济REIT', sector: '仓储物流', dividend_yield: 7.35, reason: '分红率7.35%为同类最高，仓储物流需求受电商拉动持续增长，管理人运营能力强' },
+  { code: '508001', name: '国金铁建重庆渝遂REIT', sector: '交通', dividend_yield: 7.12, reason: '分红率7.12%表现优秀，高速公路现金流稳定可预测，与其他类型形成分散化配置' },
+  { code: '508056', name: '中航首钢绿能REIT', sector: '生态环保', dividend_yield: 4.73, reason: '垃圾焚烧发电属于政策支持行业，收入来源稳定（政府补贴+上网电价），分红可持续性强' },
+];
+
+document.getElementById('picksList').innerHTML = picks.map((p, i) => `
+  <div class="pick-card ${i === 0 ? 'top' : 'normal'}">
+    <div class="pick-rank" style="background:${i === 0 ? '#f59e0b' : i < 3 ? '#3b82f6' : '#6b7280'};">${i + 1}</div>
+    <div style="flex:1;">
+      <div style="font-weight:600;font-size:14px;">
+        ${p.name}
+        <span style="color:#9ca3af;font-size:12px;margin-left:8px;font-family:monospace;">${p.code}</span>
+      </div>
+      <div style="font-size:12px;color:#6b7280;margin-top:2px;">${p.reason}</div>
+    </div>
+    <div style="text-align:right;">
+      ${sectorTag(p.sector)}
+      <div style="font-size:12px;color:#16a34a;margin-top:4px;font-weight:500;">分红率 ${p.dividend_yield}%</div>
+    </div>
+  </div>
+`).join('');
+
+// Render backtest
+const backtestItems = [
+  { code: '508028', name: '中信建投国家电投新能源REIT', pick_price: 4.567, return_1m: 2.15, return_3m: 5.43, return_6m: 8.72 },
+  { code: '180201', name: '华安张江光大REIT', pick_price: 2.458, return_1m: 1.23, return_3m: 3.67, return_6m: 6.34 },
+  { code: '508006', name: '国泰君安东久新经济REIT', pick_price: 2.789, return_1m: -0.45, return_3m: 2.18, return_6m: 4.56 },
+  { code: '508001', name: '国金铁建重庆渝遂REIT', pick_price: 4.789, return_1m: 1.89, return_3m: 4.12, return_6m: 5.89 },
+  { code: '508056', name: '中航首钢绿能REIT', pick_price: 5.123, return_1m: 1.34, return_3m: 2.52, return_6m: 3.59 },
+];
+
+document.getElementById('backtestBody').innerHTML = backtestItems.map(b => `
+  <tr>
+    <td style="font-family:monospace;">${b.code}</td>
+    <td style="font-weight:500;">${b.name}</td>
+    <td style="font-family:monospace;">${b.pick_price.toFixed(3)}</td>
+    <td>${changeTag(b.return_1m)}</td>
+    <td>${changeTag(b.return_3m)}</td>
+    <td>${changeTag(b.return_6m)}</td>
+  </tr>
+`).join('');
+
+// ===== Tab Switching =====
+document.querySelectorAll('.sub-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sub-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const tab = btn.dataset.tab;
+    document.getElementById('tab-pool').style.display = tab === 'pool' ? '' : 'none';
+    document.getElementById('tab-picks').style.display = tab === 'picks' ? '' : 'none';
+    document.getElementById('tab-backtest').style.display = tab === 'backtest' ? '' : 'none';
+  });
+});
+
+// ===== Methodology Toggle =====
+document.getElementById('methodToggle').addEventListener('click', () => {
+  const body = document.getElementById('methodBody');
+  const arrow = document.getElementById('methodArrow');
+  if (body.style.display === 'none') {
+    body.style.display = '';
+    arrow.classList.add('expanded');
+  } else {
+    body.style.display = 'none';
+    arrow.classList.remove('expanded');
+  }
+});
+</script>
+</body>
+</html>

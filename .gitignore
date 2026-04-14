@@ -23,6 +23,16 @@ test_hk.py
 
 # 截图和文档
 screenshot_*.png
+reits-*.png
 /*.pdf
 /*.docx
 report_pictures/
+
+# Playwright CLI 临时文件
+.playwright-cli/
+pool-view.yaml
+
+# 回测中间结果（JSON）
+backend/backtest_result.json
+backend/backtest_v2_llm.json
+backend/backtest_v2_multifactor.json

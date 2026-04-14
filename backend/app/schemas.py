@@ -288,3 +288,72 @@ class AIPicksOut(BaseModel):
     generated_date: str
     model_sources: str
     performance: Optional[PortfolioPerformance] = None
+
+
+# ========== C-REITs 相关 ==========
+
+class REITItemOut(BaseModel):
+    id: int
+    code: str
+    name: str
+    sector: str
+    is_active: int
+    # 实时数据（动态填充）
+    latest_price: Optional[float] = None
+    change_pct: Optional[float] = None
+    dividend_yield: Optional[float] = None
+    turnover_ratio: Optional[float] = None
+    volume: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class REITFilterLog(BaseModel):
+    total: int = 0
+    after_dividend: int = 0
+    after_income: int = 0
+    after_turnover: int = 0
+    after_sentiment: int = 0
+    final: int = 0
+
+
+class REITPickItem(BaseModel):
+    code: str
+    name: str
+    sector: str
+    dividend_yield: Optional[float] = None
+    latest_price: Optional[float] = None
+    reason: str = ""
+    score: Optional[float] = None
+
+
+class REITWeeklyPickOut(BaseModel):
+    id: int
+    week_start: date
+    week_end: date
+    picks: list[REITPickItem]
+    filter_log: Optional[REITFilterLog] = None
+    model_source: str
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class REITBacktestItem(BaseModel):
+    code: str
+    name: str
+    pick_price: Optional[float] = None
+    return_1m: Optional[float] = None
+    return_3m: Optional[float] = None
+    return_6m: Optional[float] = None
+    evaluation: str = ""
+
+
+class REITBacktestOut(BaseModel):
+    week_start: date
+    items: list[REITBacktestItem]
+    avg_return_1m: Optional[float] = None
+    avg_return_3m: Optional[float] = None
+    avg_return_6m: Optional[float] = None
