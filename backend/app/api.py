@@ -2848,7 +2848,7 @@ async def get_reits_weekly_picks(
     force: bool = False,
     db: AsyncSession = Depends(get_db),
 ):
-    """获取本周REITs推荐（不存在则自动生成，均无数据时返回演示示例）"""
+    """获取本周REITs关注列表（不存在则自动生成，均无数据时返回演示示例）"""
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=4)
@@ -2872,11 +2872,11 @@ async def get_reits_weekly_picks(
 
 @router.post("/reits/generate-picks")
 async def generate_reits_picks(db: AsyncSession = Depends(get_db)):
-    """手动触发REITs推荐生成（管理员）"""
+    """手动触发REITs关注列表生成（管理员）"""
     result = await _generate_reit_weekly_picks(db)
     if result:
         return result
-    raise HTTPException(status_code=500, detail="REITs推荐生成失败")
+    raise HTTPException(status_code=500, detail="REITs关注列表生成失败")
 
 
 @router.get("/reits/weekly-picks/history")
@@ -2884,7 +2884,7 @@ async def get_reits_picks_history(
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
 ):
-    """获取历史周推荐列表"""
+    """获取历史周关注列表"""
     result = await db.execute(
         select(REITWeeklyPick)
         .order_by(REITWeeklyPick.week_start.desc())
@@ -2978,7 +2978,7 @@ async def get_reits_price_history(code: str, days: int = 90):
 # ── REITs 内部辅助函数 ──
 
 def _demo_weekly_picks(week_start, week_end) -> dict:
-    """返回演示用的每周推荐示例数据（当AI筛选不可用时）"""
+    """返回演示用的每周关注示例数据（当AI筛选不可用时）"""
     return {
         "id": None,
         "week_start": str(week_start),
@@ -3040,7 +3040,7 @@ def _demo_weekly_picks(week_start, week_end) -> dict:
 
 
 def _format_weekly_pick(pick: REITWeeklyPick) -> dict:
-    """格式化周推荐记录"""
+    """格式化周关注记录"""
     import json
     picks_list = []
     try:

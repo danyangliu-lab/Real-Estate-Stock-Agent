@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../api'
-import DailyDigestPanel from './DailyDigestPanel'
 import WeeklyDigestPanel from './WeeklyDigestPanel'
 
 const MAX_WATCHLIST = 15
@@ -265,8 +264,6 @@ export default function WatchlistSection({ user }) {
                 ))}
               </div>
 
-              {/* AI推荐选股日报 */}
-              <DailyDigestPanel type="ai_picks" />
               {/* AI推荐选股周报 */}
               <WeeklyDigestPanel type="ai_picks" />
 
@@ -390,8 +387,6 @@ export default function WatchlistSection({ user }) {
             </div>
           )}
 
-          {/* 自选股日报 */}
-          {watchlist.length > 0 && <DailyDigestPanel type="watchlist" />}
           {/* 自选股周报 */}
           {watchlist.length > 0 && <WeeklyDigestPanel type="watchlist" />}
 

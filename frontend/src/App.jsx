@@ -8,16 +8,14 @@ import StatsCards from './components/StatsCards'
 import CommentarySection from './components/CommentarySection'
 import ReportSection from './components/ReportSection'
 import UserManagement from './components/UserManagement'
-import NewsSection from './components/NewsSection'
 import WatchlistSection from './components/WatchlistSection'
-import DailyDigestPanel from './components/DailyDigestPanel'
 import WeeklyDigestPanel from './components/WeeklyDigestPanel'
 import REITsSection from './components/REITsSection'
 
 const BASE_TABS = [
   { key: 'rating', label: 'AI评级' },
   { key: 'watchlist', label: '自选股' },
-  { key: 'reits', label: 'REITs' },
+  { key: 'reits', label: 'REITs · 周度组合' },
   { key: 'commentary', label: '市场点评' },
   { key: 'report', label: '研究报告' },
 ]
@@ -272,8 +270,6 @@ export default function App() {
             </div>
 
             <StatsCards dashboard={dashboard} modelType={modelType} />
-            <NewsSection />
-            <DailyDigestPanel type="industry" />
             <WeeklyDigestPanel type="industry" />
             <RatingMethodology modelType={modelType} />
 

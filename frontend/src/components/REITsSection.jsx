@@ -56,7 +56,7 @@ export default function REITsSection({ user }) {
   const [loading, setLoading] = useState(true)
   const [sectorFilter, setSectorFilter] = useState('')
 
-  // 每周推荐
+  // 每周关注
   const [weeklyPicks, setWeeklyPicks] = useState(null)
   const [picksLoading, setPicksLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -109,7 +109,7 @@ export default function REITsSection({ user }) {
     }
   }, [sectorFilter])
 
-  // 加载每周推荐
+  // 加载每周关注
   const loadPicks = useCallback(async () => {
     setPicksLoading(true)
     try {
@@ -120,7 +120,7 @@ export default function REITsSection({ user }) {
       setWeeklyPicks(picks)
       setPicksHistory(history || [])
     } catch (e) {
-      console.error('加载REITs推荐失败:', e)
+      console.error('加载REITs关注列表失败:', e)
     }
     setPicksLoading(false)
   }, [])
@@ -182,6 +182,46 @@ export default function REITsSection({ user }) {
 
   return (
     <div>
+      {/* 周度组合醒目标识 */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '12px 20px',
+        marginBottom: 16,
+        background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #2563eb 100%)',
+        borderRadius: 10,
+        color: '#fff',
+        boxShadow: '0 2px 8px rgba(37, 99, 235, 0.25)',
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          fontSize: 18,
+          fontWeight: 700,
+          letterSpacing: 1,
+        }}>
+          <span style={{ fontSize: 22 }}>📋</span>
+          C-REITs 周度组合
+        </div>
+        <div style={{
+          padding: '3px 12px',
+          background: 'rgba(255,255,255,0.2)',
+          borderRadius: 20,
+          fontSize: 12,
+          fontWeight: 600,
+          backdropFilter: 'blur(4px)',
+          border: '1px solid rgba(255,255,255,0.3)',
+        }}>
+          ⏱ 周度更新
+        </div>
+        <div style={{ flex: 1 }} />
+        <div style={{ fontSize: 12, opacity: 0.85 }}>
+          每周日凌晨自动运行5层智能筛选 · 三模型AI联合评选
+        </div>
+      </div>
+
       {/* 子Tab切换 */}
       <div style={{
         display: 'flex',
@@ -194,7 +234,7 @@ export default function REITsSection({ user }) {
       }}>
         {[
           { key: 'pool', label: `REITs自选池 (${totalReits})` },
-          { key: 'picks', label: '每周推荐' },
+          { key: 'picks', label: '每周关注' },
           { key: 'backtest', label: '回测评价' },
         ].map(t => (
           <button
@@ -336,13 +376,26 @@ export default function REITsSection({ user }) {
         </>
       )}
 
-      {/* ========== 每周推荐 ========== */}
+      {/* ========== 每周关注 ========== */}
       {subTab === 'picks' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ margin: 0, fontSize: 16 }}>
-              📊 C-REITs 每周精选 · 5只推荐
-            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <h3 style={{ margin: 0, fontSize: 16 }}>
+                📊 C-REITs 每周精选 · 5只关注
+              </h3>
+              <span style={{
+                display: 'inline-block',
+                padding: '2px 10px',
+                background: '#2563eb',
+                color: '#fff',
+                borderRadius: 12,
+                fontSize: 11,
+                fontWeight: 600,
+              }}>
+                周度组合
+              </span>
+            </div>
             {user?.is_admin && (
               <button
                 className="btn btn-sm"
@@ -355,7 +408,7 @@ export default function REITsSection({ user }) {
                   borderColor: generating ? '#d1d5db' : '#93c5fd',
                 }}
               >
-                {generating ? '生成中...' : '重新生成推荐'}
+                {generating ? '生成中...' : '重新生成关注列表'}
               </button>
             )}
           </div>
@@ -380,11 +433,11 @@ export default function REITsSection({ user }) {
             </div>
           ) : weeklyPicks && weeklyPicks.picks && weeklyPicks.picks.length > 0 ? (
             <>
-              {/* 本周推荐 */}
+              {/* 本周关注 */}
               <div className="card" style={{ padding: 16, marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <span style={{ fontSize: 14, fontWeight: 600 }}>
-                    本周推荐 ({weeklyPicks.week_start} ~ {weeklyPicks.week_end})
+                    本周关注 ({weeklyPicks.week_start} ~ {weeklyPicks.week_end})
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     模型: {weeklyPicks.model_source || 'MiniMax M2.5 + GLM-5 + Kimi K2.5'}
@@ -406,7 +459,7 @@ export default function REITsSection({ user }) {
                       { label: '收入', val: weeklyPicks.filter_log.after_income, color: '#0284c7' },
                       { label: '换手率', val: weeklyPicks.filter_log.after_turnover, color: '#7c3aed' },
                       { label: '舆情', val: weeklyPicks.filter_log.after_sentiment, color: '#db2777' },
-                      { label: '推荐', val: weeklyPicks.filter_log.final, color: '#dc2626' },
+                      { label: '关注', val: weeklyPicks.filter_log.final, color: '#dc2626' },
                     ].map((s, i) => (
                       <React.Fragment key={s.label}>
                         <div style={{
@@ -422,7 +475,7 @@ export default function REITsSection({ user }) {
                   </div>
                 )}
 
-                {/* 推荐列表 */}
+                {/* 关注列表 */}
                 <div style={{ display: 'grid', gap: 10 }}>
                   {weeklyPicks.picks.map((p, i) => (
                     <div key={p.code} style={{
@@ -466,14 +519,14 @@ export default function REITsSection({ user }) {
                 </div>
               </div>
 
-              {/* 历史推荐 */}
+              {/* 历史关注 */}
               {picksHistory.length > 1 && (
                 <div className="card" style={{ padding: 16 }}>
                   <div
                     style={{ fontSize: 14, fontWeight: 600, cursor: 'pointer', display: 'flex', justifyContent: 'space-between' }}
                     onClick={() => setHistoryExpanded(!historyExpanded)}
                   >
-                    <span>📅 历史推荐记录 ({picksHistory.length}期)</span>
+                    <span>📅 历史关注记录 ({picksHistory.length}期)</span>
                     <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>
                       {historyExpanded ? '收起 ▲' : '展开 ▼'}
                     </span>
@@ -511,9 +564,9 @@ export default function REITsSection({ user }) {
           ) : (
             <div className="empty-state">
               <div className="empty-state-icon">📊</div>
-              <div className="empty-state-title">暂无推荐数据</div>
+              <div className="empty-state-title">暂无关注数据</div>
               <div className="empty-state-desc">
-                {user?.is_admin ? '点击"重新生成推荐"按钮生成本周REITs推荐' : '系统将在每周一自动生成推荐'}
+                {user?.is_admin ? '点击"重新生成关注列表"按钮生成本周REITs关注列表' : '系统将在每周一自动生成关注列表'}
               </div>
             </div>
           )}
@@ -524,7 +577,7 @@ export default function REITsSection({ user }) {
       {subTab === 'backtest' && (
         <>
           <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>
-            📈 REITs推荐回测评价
+            📈 REITs关注回测评价
           </h3>
 
           {backtestLoading ? (
@@ -564,14 +617,14 @@ export default function REITsSection({ user }) {
               {/* 明细 */}
               <div className="card" style={{ padding: 16 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>
-                  推荐期: {backtest.week_start}
+                  关注期: {backtest.week_start}
                 </div>
                 <table className="table">
                   <thead>
                     <tr>
                       <th>代码</th>
                       <th>名称</th>
-                      <th>推荐价</th>
+                      <th>关注价</th>
                       <th>1个月</th>
                       <th>3个月</th>
                       <th>6个月</th>
@@ -599,7 +652,7 @@ export default function REITsSection({ user }) {
               <div className="empty-state-icon">📈</div>
               <div className="empty-state-title">暂无回测数据</div>
               <div className="empty-state-desc">
-                回测数据需要在推荐生成后一段时间才会有结果（至少1个月）
+                回测数据需要在关注列表生成后一段时间才会有结果（至少1个月）
               </div>
             </div>
           )}

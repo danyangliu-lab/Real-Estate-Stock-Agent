@@ -44,7 +44,7 @@ function REITsScreeningMethodology() {
         <span className="formula-part ai">AI综合评选</span>
       </div>
       <div className="methodology-fallback">
-        82只C-REITs全覆盖 → 5层逐步过滤 → 最终推荐Top 5；三模型(MiniMax M2.5+GLM-5+Kimi K2.5)投票决策；每周日凌晨1点自动运行
+        82只C-REITs全覆盖 → 5层逐步过滤 → 最终关注Top 5；三模型(MiniMax M2.5+GLM-5+Kimi K2.5)投票决策；每周日凌晨1点自动运行
       </div>
 
       <div className="methodology-columns">
@@ -91,7 +91,7 @@ function REITsScreeningMethodology() {
             <DimensionItem
               name="零换手率剔除"
               weight="核心"
-              desc="检查最近10个交易日（2周）的成交量，全部为0则剔除——无法退出的品种不推荐"
+              desc="检查最近10个交易日（2周）的成交量，全部为0则剔除——无法退出的品种不纳入关注"
             />
             <DimensionItem
               name="市场数据提取"
@@ -136,7 +136,7 @@ function REITsScreeningMethodology() {
             第5层: AI综合评选
           </div>
           <div className="methodology-col-desc">
-            三模型独立推荐+加权融合+共识加分，输出最终Top 5
+            三模型独立评选+加权融合+共识加分，输出最终Top 5
           </div>
           <div className="dimension-list">
             <DimensionItem
@@ -157,7 +157,7 @@ function REITsScreeningMethodology() {
             <DimensionItem
               name="共识加分"
               weight="机制"
-              desc="被2个模型同时推荐+10%，3个模型全票推荐+20%，多模型共识更可靠"
+              desc="被2个模型同时选中+10%，3个模型全票选中+20%，多模型共识更可靠"
             />
           </div>
         </div>
@@ -175,7 +175,7 @@ function REITsScreeningMethodology() {
           📈 回测评价机制
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-          每期推荐自动计算1/3/6个月收益率（推荐日买入收盘价，目标日最近交易日收盘价）。
+          每期关注列表自动计算1/3/6个月收益率（关注日买入收盘价，目标日最近交易日收盘价）。
           三模型联合生成回测评价，从收益表现、稳定性、持有期特征和改进建议四个维度进行分析。
         </div>
       </div>
@@ -194,7 +194,7 @@ function REITsScreeningMethodology() {
         <div style={{ fontSize: 12, color: '#a16207', lineHeight: 1.6 }}>
           <strong>数据降级</strong>：分红率获取支持三级降级（iFinD指标→日频序列→历史行情估算），确保数据可用性。
           <br />
-          <strong>AI降级</strong>：若所有模型调用失败，自动切换为分红率+类型多元化的量化排序选择，保证推荐输出。
+          <strong>AI降级</strong>：若所有模型调用失败，自动切换为分红率+类型多元化的量化排序选择，保证关注列表输出。
           <br />
           <strong>筛选降级</strong>：各层数据不可用时自动跳过（全部保留），不会因数据缺失导致误杀。
         </div>
