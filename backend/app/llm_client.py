@@ -26,7 +26,7 @@ async def _call_tokenhub_openai(
     prompt: str,
     system: str = "",
     temperature: Optional[float] = None,
-    enable_search: bool = False,
+    enable_search: bool = False,  # 兼容旧调用，TokenHub 上当前三模型均不支持 ai_search，统一忽略
     label: str = "",
 ) -> Optional[str]:
     """调用腾讯云 TokenHub OpenAI 兼容接口（三模型共用）"""
@@ -46,8 +46,10 @@ async def _call_tokenhub_openai(
     }
     if temperature is not None:
         body["temperature"] = temperature
-    if enable_search:
-        body["enable_search"] = True
+    # 注：腾讯云 TokenHub 上的 minimax-m2.7 / deepseek-v4-pro / kimi-k2.6
+    # 均不支持 enable_search/ai_search 字段（会返回 400 gateway_error code=400005），
+    # 故此处不再把 enable_search 透传到接口；联网检索改由上游 prompt 自行注入背景信息。
+    _ = enable_search  # 显式标记保留参数
 
     headers = {
         "Authorization": f"Bearer {TOKENHUB_API_KEY}",
@@ -61,7 +63,10 @@ async def _call_tokenhub_openai(
                 headers=headers,
                 json=body,
             )
-            resp.raise_for_status()
+            if resp.status_code >= 400:
+                # 把网关返回的 error 信息打出来，便于排查
+                logger.error(f"{label} HTTP {resp.status_code}: {resp.text[:500]}")
+                return None
             data = resp.json()
 
             if "choices" in data and len(data["choices"]) > 0:
