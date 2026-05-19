@@ -759,25 +759,28 @@ def fetch_reports(codes: List[str], market: str, days: int = 30,
 
 def fetch_recent_announcements(code: str, market: str, days: int = 30) -> Optional[str]:
     """获取单只股票近期公告摘要（用于AI分析）
-    返回格式化的公告标题列表字符串
+
+    注：当前 iFinD 账号未授权 report_query 接口（每次返回 -4001），
+    继续调用会显著拖慢评分（每只股票多耗 0.5-1s 用于刷 token），
+    因此本函数直接返回 None，由各调用方使用 `or ""` 兜底为空字符串。
+    若日后开通公告权限，恢复下方原实现即可。
     """
-    reports = fetch_reports([code], market, days=days)
-    if not reports:
-        return None
+    return None
 
-    # 取最近10条公告
-    recent = reports[:10]
-    lines = []
-    for r in recent:
-        date_str = r.get("report_date", "")
-        title = r.get("report_title", "")
-        if title:
-            lines.append(f"  [{date_str}] {title}")
-
-    if not lines:
-        return None
-
-    return "【近期公告（同花顺iFinD）】\n" + "\n".join(lines)
+    # —— 原实现（待 iFinD 公告接口开通后恢复） ——
+    # reports = fetch_reports([code], market, days=days)
+    # if not reports:
+    #     return None
+    # recent = reports[:10]
+    # lines = []
+    # for r in recent:
+    #     date_str = r.get("report_date", "")
+    #     title = r.get("report_title", "")
+    #     if title:
+    #         lines.append(f"  [{date_str}] {title}")
+    # if not lines:
+    #     return None
+    # return "【近期公告（同花顺iFinD）】\n" + "\n".join(lines)
 
 
 # =====================================================================
