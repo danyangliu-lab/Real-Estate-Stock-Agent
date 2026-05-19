@@ -44,7 +44,7 @@ function REITsScreeningMethodology() {
         <span className="formula-part ai">AI综合评选</span>
       </div>
       <div className="methodology-fallback">
-        82只C-REITs全覆盖 → 5层逐步过滤 → 最终关注Top 5；三模型(MiniMax M2.5+GLM-5+Kimi K2.5)投票决策；每周日凌晨1点自动运行
+        82只C-REITs全覆盖 → 5层逐步过滤 → 最终关注Top 5；三模型(MiniMax M2.7+DeepSeek V4 Pro+Kimi K2.6)投票决策；每周日凌晨1点自动运行
       </div>
 
       <div className="methodology-columns">
@@ -119,7 +119,7 @@ function REITsScreeningMethodology() {
             <DimensionItem
               name="三模型投票"
               weight="机制"
-              desc="MiniMax M2.5 + GLM-5 + Kimi K2.5各自独立判断，超过半数认为负面才剔除"
+              desc="MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6各自独立判断，超过半数认为负面才剔除"
             />
             <DimensionItem
               name="保守策略"

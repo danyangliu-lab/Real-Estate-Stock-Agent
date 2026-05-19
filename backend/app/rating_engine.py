@@ -28,7 +28,7 @@
   【AI增强】AI可动态挖掘增强因子（如现金毛利因子CGP_TTM、留存市值比REP_LF）
 
 三、AI大模型评分 (0-100分):
-  MiniMax M2.5 + GLM-5 + Kimi K2.5 三模型联合分析
+  MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6 三模型联合分析
   【新增】AI同时输出 weight_hints 动态权重建议，用于调整量化各维度权重
   【新增】AI输出 sentiment_score 独立情绪评分，反馈到情绪因子维度
 
@@ -1238,7 +1238,7 @@ def _fuse_tri_model_results(
     name: str,
     model_label: str = "",
 ) -> Optional[Dict]:
-    """融合 MiniMax M2.5 + GLM-5 + Kimi K2.5 三模型评分结果
+    """融合 MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6 三模型评分结果
 
     策略：
     - 多模型成功：按配置权重加权融合，权重自动归一化
@@ -1257,7 +1257,7 @@ def _fuse_tri_model_results(
     if glm_result:
         results.append(glm_result)
         weights.append(GLM_WEIGHT)
-        labels.append(f"GLM-5({glm_result['ai_score']}分)")
+        labels.append(f"DeepSeek({glm_result['ai_score']}分)")
     if kimi_result:
         results.append(kimi_result)
         weights.append(KIMI_WEIGHT)
@@ -1324,7 +1324,7 @@ def _fuse_tri_model_results(
 
 async def get_ai_rating(name: str, code: str, market: str, df: pd.DataFrame,
                        quant_scores: Dict, fundamentals: Optional[dict] = None) -> Optional[Dict]:
-    """获取AI大模型评分（MiniMax M2.5 + GLM-5 + Kimi K2.5 三模型融合）
+    """获取AI大模型评分（MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6 三模型融合）
 
     【改进】现在AI同时输出:
     - ai_score: 综合评分
@@ -1352,7 +1352,7 @@ async def get_ai_rating(name: str, code: str, market: str, df: pd.DataFrame,
         task_labels.append("MiniMax")
     if GLM_ENABLED:
         tasks.append(chat_glm(prompt, system=AI_SYSTEM_PROMPT, temperature=0.3))
-        task_labels.append("GLM-5")
+        task_labels.append("DeepSeek")
     if KIMI_ENABLED:
         tasks.append(chat_kimi(prompt, system=AI_SYSTEM_PROMPT))
         task_labels.append("Kimi")
@@ -1372,7 +1372,7 @@ async def get_ai_rating(name: str, code: str, market: str, df: pd.DataFrame,
         # resp is None means model disabled or failed silently
 
     return _fuse_tri_model_results(
-        parsed.get("MiniMax"), parsed.get("GLM-5"), parsed.get("Kimi"),
+        parsed.get("MiniMax"), parsed.get("DeepSeek"), parsed.get("Kimi"),
         name, "量化AI",
     )
 
@@ -1881,7 +1881,7 @@ async def _get_soochow_ai_rating(name: str, code: str, market: str,
             task_labels.append("MiniMax")
         if GLM_ENABLED:
             tasks.append(chat_glm(user_msg, system=SOOCHOW_AI_PROMPT, temperature=0.3))
-            task_labels.append("GLM-5")
+            task_labels.append("DeepSeek")
         if KIMI_ENABLED:
             tasks.append(chat_kimi(user_msg, system=SOOCHOW_AI_PROMPT))
             task_labels.append("Kimi")
@@ -1899,7 +1899,7 @@ async def _get_soochow_ai_rating(name: str, code: str, market: str,
                 parsed[label] = _parse_soochow_ai_response(resp)
 
         return _fuse_tri_model_results(
-            parsed.get("MiniMax"), parsed.get("GLM-5"), parsed.get("Kimi"),
+            parsed.get("MiniMax"), parsed.get("DeepSeek"), parsed.get("Kimi"),
             name, "东吴AI",
         )
 

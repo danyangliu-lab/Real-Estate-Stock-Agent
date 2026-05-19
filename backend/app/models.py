@@ -173,7 +173,7 @@ class DailyDigest(Base):
     user_id = Column(Integer, nullable=False, default=0)  # 0=全局(行业日报), >0=用户专属(自选股日报)
     title = Column(String(300), nullable=False)
     content = Column(Text, nullable=False)
-    model_sources = Column(String(200), default="")  # 使用的模型来源，如 "MiniMax,GLM-5,Kimi"
+    model_sources = Column(String(200), default="")  # 使用的模型来源，如 "MiniMax,DeepSeek V4 Pro,Kimi"
     created_at = Column(DateTime, default=datetime.now)
 
 

@@ -16,7 +16,7 @@
 - **自选池管理**：82 只 C-REITs 完整清单，实时行情展示
 - **智能筛选推荐**：5 层漏斗策略，每周自动推荐 5 只最优 REITs
 - **回测评价**：1/3/6 个月收益率计算 + AI 专业评价
-- **三模型联合决策**：MiniMax M2.5 + GLM-5 + Kimi K2.5 多模型投票
+- **三模型联合决策**：MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6 多模型投票
 
 ### 1.3 核心亮点
 
@@ -46,7 +46,7 @@
 │         │                  │                         │
 │  ┌──────▼──────────────────▼───────┐                │
 │  │       llm_client.py             │                │
-│  │  MiniMax M2.5 / GLM-5 / Kimi   │                │
+│  │  MiniMax M2.7 / DeepSeek V4 Pro / Kimi   │                │
 │  └──────┬──────────────────────────┘                │
 │         │                                            │
 │  ┌──────▼──────────────────────────┐                │
@@ -100,13 +100,13 @@ iFinD API → fetch_reit_history() (逐只, 30日)
 第3层: filter_by_zero_turnover() → 剔除零换手率
     │
     ▼ 通过代码
-三模型并发 → MiniMax + GLM-5 + Kimi
+三模型并发 → MiniMax + DeepSeek + Kimi
     │
     ▼ 投票结果
 第4层: filter_by_sentiment() → 多数投票剔除负面舆情
     │
     ▼ 候选代码
-三模型并发 → MiniMax + GLM-5 + Kimi
+三模型并发 → MiniMax + DeepSeek + Kimi
     │
     ▼ 加权评分排序
 第5层: ai_select_top_reits() → Top 5 推荐
@@ -226,11 +226,11 @@ results = await asyncio.gather(*futures)
 **三模型投票机制**：
 
 ```
-MiniMax M2.5  ──┐
+MiniMax M2.7  ──┐
                  ├──→ 投票汇总 ──→ 多数判定
-GLM-5        ──┤      (>50% 认为负面才剔除)
+DeepSeek V4 Pro        ──┤      (>50% 认为负面才剔除)
                  │
-Kimi K2.5    ──┘
+Kimi K2.6    ──┘
 ```
 
 ```python
@@ -373,7 +373,7 @@ return_6m = (price_at_target / price_at_pick - 1) * 100%
 3. 不同持有期的收益特征
 4. 改进建议
 
-每个模型的评价会带上模型标签（如 `【MiniMax评价】`、`【GLM-5评价】`），方便对比各模型观点。
+每个模型的评价会带上模型标签（如 `【MiniMax评价】`、`【DeepSeek V4 Pro评价】`），方便对比各模型观点。
 
 ---
 
@@ -472,7 +472,7 @@ top_n: int = 5          # 推荐数量
         "after_sentiment": 52,
         "final": 5
     },
-    "model_source": "MiniMax M2.5 + GLM-5 + Kimi K2.5"
+    "model_source": "MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6"
 }
 ```
 
@@ -729,9 +729,9 @@ const BASE_TABS = [
 
 | 模型 | 权重 | 特点 |
 |------|------|------|
-| MiniMax M2.5 | 40% | 最新发布，综合能力强，支持联网搜索 |
-| GLM-5 | 30% | 智谱AI旗舰模型，中文理解能力优秀 |
-| Kimi K2.5 | 30% | Moonshot AI模型，长文本推理能力强 |
+| MiniMax M2.7 | 40% | 最新发布，综合能力强，支持联网搜索 |
+| DeepSeek V4 Pro | 30% | 智谱AI旗舰模型，中文理解能力优秀 |
+| Kimi K2.6 | 30% | Moonshot AI模型，长文本推理能力强 |
 
 ### 6.2 舆情判断：投票制
 
@@ -775,7 +775,7 @@ const BASE_TABS = [
 【MiniMax评价】
 整体来看，本期推荐组合1个月收益率表现...
 
-【GLM-5评价】
+【DeepSeek V4 Pro评价】
 从回测数据分析，推荐的5只REITs中...
 
 【Kimi评价】
@@ -860,7 +860,7 @@ const BASE_TABS = [
 
 1. **基本面驱动**：以分红率为核心锚点，不追逐短期价格波动，符合 REITs 的"类固收"投资属性
 2. **多层风控**：5 层串行筛选逐步过滤风险品种，负面舆情层通过三模型投票进一步降低"踩雷"概率
-3. **AI 增强选股**：在量化筛选基础上，引入三大模型（MiniMax M2.5 + GLM-5 + Kimi K2.5）联合评选，利用 AI 的知识广度弥补纯量化模型的不足
+3. **AI 增强选股**：在量化筛选基础上，引入三大模型（MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6）联合评选，利用 AI 的知识广度弥补纯量化模型的不足
 4. **共识机制可靠**：被多个独立模型同时推荐的品种获得共识加分，跨模型一致看好意味着更高的投资确定性
 5. **降级保障**：当 AI 模型不可用时，自动降级为分红率+类型多元化的量化选择，确保系统可用性
 

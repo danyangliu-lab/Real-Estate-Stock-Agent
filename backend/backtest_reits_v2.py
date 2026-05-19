@@ -429,7 +429,7 @@ async def llm_rerank(
     """使用大模型对多因子候选池进行重新排序
     
     策略: 向LLM提供候选池的量化指标 + 市场背景，让LLM做最终选择
-    使用三模型投票(MiniMax + GLM-5 + Kimi)
+    使用三模型投票(MiniMax + DeepSeek + Kimi)
     """
     from app.llm_client import chat_minimax, chat_glm, chat_kimi
     from app.config import MINIMAX_ENABLED, GLM_ENABLED, KIMI_ENABLED
@@ -491,7 +491,7 @@ async def llm_rerank(
             task_labels.append("MiniMax")
         if GLM_ENABLED:
             tasks.append(chat_glm(prompt, system=system, temperature=0.2))
-            task_labels.append("GLM-5")
+            task_labels.append("DeepSeek")
         if KIMI_ENABLED:
             tasks.append(chat_kimi(prompt, system=system))
             task_labels.append("Kimi")

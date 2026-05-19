@@ -19,16 +19,16 @@ TENCENT_SECRET_KEY = os.getenv("HUNYUAN_SECRET_KEY", "")
 # LKEAP OpenAI 兼容接口 API Key（三模型共用）
 LKEAP_API_KEY = os.getenv("LKEAP_API_KEY", "")
 
-# ── MiniMax M2.5 配置（LKEAP OpenAI 兼容接口）──
-MINIMAX_MODEL = os.getenv("MINIMAX_MODEL", "minimax-m2.5")
+# ── MiniMax M2.7 配置（LKEAP OpenAI 兼容接口）──
+MINIMAX_MODEL = os.getenv("MINIMAX_MODEL", "minimax-m2.7")
 MINIMAX_ENABLED = os.getenv("MINIMAX_ENABLED", "true").lower() == "true"
 
-# ── GLM-5 配置（LKEAP OpenAI 兼容接口）──
-GLM_MODEL = os.getenv("GLM_MODEL", "glm-5")
+# ── DeepSeek V4 Pro 配置（LKEAP OpenAI 兼容接口）──
+GLM_MODEL = os.getenv("GLM_MODEL", "deepseek-v4-pro")
 GLM_ENABLED = os.getenv("GLM_ENABLED", "true").lower() == "true"
 
-# ── Kimi K2.5 配置（LKEAP OpenAI 兼容接口）──
-KIMI_MODEL = os.getenv("KIMI_MODEL", "kimi-k2.5")
+# ── Kimi K2.6 配置（LKEAP OpenAI 兼容接口）──
+KIMI_MODEL = os.getenv("KIMI_MODEL", "kimi-k2.6")
 KIMI_ENABLED = os.getenv("KIMI_ENABLED", "true").lower() == "true"
 
 # 三模型融合权重（之和应为1.0）

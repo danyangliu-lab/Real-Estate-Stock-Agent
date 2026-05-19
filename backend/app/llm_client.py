@@ -1,5 +1,5 @@
 """
-腾讯云多模型客户端（MiniMax M2.5 + GLM-5 + Kimi K2.5 三模型）
+腾讯云 TokenHub 多模型客户端（MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6 三模型）
 - 三个模型均使用 LKEAP OpenAI 兼容接口（Bearer Token）
 """
 
@@ -82,7 +82,7 @@ async def _call_lkeap_openai(
         return None
 
 
-# ── MiniMax M2.5 ──
+# ── MiniMax M2.7 ──
 
 async def chat_minimax(
     prompt: str,
@@ -90,7 +90,7 @@ async def chat_minimax(
     temperature: float = 0.3,
     enable_search: bool = False,
 ) -> Optional[str]:
-    """调用 MiniMax M2.5（LKEAP OpenAI 兼容接口）"""
+    """调用 MiniMax M2.7（LKEAP OpenAI 兼容接口）"""
     if not MINIMAX_ENABLED:
         return None
     return await _call_lkeap_openai(
@@ -99,7 +99,7 @@ async def chat_minimax(
         system=system,
         temperature=temperature,
         enable_search=enable_search,
-        label="MiniMax",
+        label="MiniMax-M2.7",
     )
 
 
@@ -109,7 +109,7 @@ async def chat_deepseek(
     temperature: float = 0.3,
     enable_search: bool = False,
 ) -> Optional[str]:
-    """chat_minimax 的兼容别名（原 DeepSeek 接口已切换为 MiniMax M2.5）"""
+    """chat_minimax 的兼容别名"""
     return await chat_minimax(prompt, system, temperature, enable_search)
 
 
@@ -123,14 +123,17 @@ async def chat_hunyuan(
     return await chat_minimax(prompt, system, temperature, enable_search)
 
 
-# ── GLM-5 ──
+# ── DeepSeek V4 Pro（保留 chat_glm 函数名以兼容已有调用）──
 
 async def chat_glm(
     prompt: str,
     system: str = "",
     temperature: float = 0.3,
 ) -> Optional[str]:
-    """调用 GLM-5（LKEAP OpenAI 兼容接口）"""
+    """调用 DeepSeek V4 Pro（LKEAP OpenAI 兼容接口）
+
+    注意：函数名保留为 chat_glm 以兼容已有调用方，实际模型已切换为 DeepSeek V4 Pro
+    """
     if not GLM_ENABLED:
         return None
     return await _call_lkeap_openai(
@@ -138,18 +141,18 @@ async def chat_glm(
         prompt=prompt,
         system=system,
         temperature=temperature,
-        label="GLM-5",
+        label="DeepSeek-V4-Pro",
     )
 
 
-# ── Kimi K2.5 ──
+# ── Kimi K2.6 ──
 
 async def chat_kimi(
     prompt: str,
     system: str = "",
 ) -> Optional[str]:
-    """调用 Kimi K2.5（LKEAP OpenAI 兼容接口）
-    注意：Kimi K2.5 不支持 temperature / top_p 参数
+    """调用 Kimi K2.6（LKEAP OpenAI 兼容接口）
+    注意：Kimi 系列暂不支持 temperature / top_p 参数
     """
     if not KIMI_ENABLED:
         return None
@@ -157,6 +160,6 @@ async def chat_kimi(
         model=KIMI_MODEL,
         prompt=prompt,
         system=system,
-        temperature=None,  # Kimi K2.5 不支持
-        label="Kimi-K2.5",
+        temperature=None,  # Kimi 系列不支持
+        label="Kimi-K2.6",
     )

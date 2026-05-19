@@ -923,7 +923,7 @@ async def get_watchlist_analysis(
         task_labels.append("MiniMax")
     if GLM_ENABLED:
         tasks.append(chat_glm(prompt, system=system, temperature=0.3))
-        task_labels.append("GLM-5")
+        task_labels.append("DeepSeek")
     if KIMI_ENABLED:
         tasks.append(chat_kimi(prompt, system=system))
         task_labels.append("Kimi")
@@ -1445,7 +1445,7 @@ async def _generate_ai_picks(db: AsyncSession) -> tuple:
         task_labels.append("MiniMax")
     if GLM_ENABLED:
         tasks.append(chat_glm(prompt, system=system, temperature=0.3))
-        task_labels.append("GLM-5")
+        task_labels.append("DeepSeek")
     if KIMI_ENABLED:
         tasks.append(chat_kimi(prompt, system=system))
         task_labels.append("Kimi")
@@ -1667,7 +1667,7 @@ async def _generate_digest_with_multi_model(prompt: str) -> dict:
         task_labels.append("MiniMax")
     if GLM_ENABLED:
         tasks.append(chat_glm(prompt, system=system, temperature=0.4))
-        task_labels.append("GLM-5")
+        task_labels.append("DeepSeek")
     if KIMI_ENABLED:
         tasks.append(chat_kimi(prompt, system=system))
         task_labels.append("Kimi")
@@ -1906,7 +1906,7 @@ async def _build_ai_picks_digest_prompt(db: AsyncSession) -> str:
         total_ret = (cum_factor - 1) * 100
         perf_note = f"AI推荐组合近30日模拟累计收益率：{total_ret:+.2f}%。"
 
-    return f"""你是一位专业的房地产股票投资顾问。以下是AI智能选股系统（三模型融合：MiniMax M2.5 + GLM-5 + Kimi K2.5）今日推荐的股票组合（{len(picks_data)}只）：
+    return f"""你是一位专业的房地产股票投资顾问。以下是AI智能选股系统（三模型融合：MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6）今日推荐的股票组合（{len(picks_data)}只）：
 
 {perf_note}
 
@@ -3033,7 +3033,7 @@ def _demo_weekly_picks(week_start, week_end) -> dict:
             "after_sentiment": 32,
             "final": 5,
         },
-        "model_source": "演示数据（MiniMax M2.5 + GLM-5 + Kimi K2.5）",
+        "model_source": "演示数据（MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6）",
         "created_at": None,
         "is_demo": True,
     }
@@ -3090,7 +3090,7 @@ async def _generate_reit_weekly_picks(db: AsyncSession) -> Optional[dict]:
 
         picks = screening.get("picks", [])
         filter_log = screening.get("filter_log", {})
-        model_source = screening.get("model_source", "MiniMax M2.5 + GLM-5 + Kimi K2.5")
+        model_source = screening.get("model_source", "MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6")
 
         if not picks:
             logger.warning("REITs筛选无结果")

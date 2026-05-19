@@ -6,7 +6,7 @@ C-REITs 筛选策略引擎
   2. 剔除过去两年收入环比下降的REITs
   3. 剔除连续2周换手率为0的REITs（并发获取行情数据）
   4. 剔除有负面舆情的REITs
-  5. AI大模型综合评选，推荐Top 5（三模型联合：MiniMax M2.5 + GLM-5 + Kimi K2.5）
+  5. AI大模型综合评选，推荐Top 5（三模型联合：MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6）
      - 向AI提供量化市场数据（换手率、近期涨跌幅、价格区间等）
      - 共识加分机制：多模型同时推荐的REITs获得额外加分
 
@@ -216,7 +216,7 @@ async def filter_by_sentiment(
     reit_codes: List[str],
     reit_names: Dict[str, str],
 ) -> Dict[str, Any]:
-    """使用AI三模型联合判断是否有负面舆情（MiniMax M2.5 + GLM-5 + Kimi K2.5）
+    """使用AI三模型联合判断是否有负面舆情（MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6）
     
     Args:
         reit_codes: 待筛选代码
@@ -269,7 +269,7 @@ REITs列表：
             task_labels.append("MiniMax")
         if GLM_ENABLED:
             tasks.append(chat_glm(prompt, system=system, temperature=0.1))
-            task_labels.append("GLM-5")
+            task_labels.append("DeepSeek")
         if KIMI_ENABLED:
             tasks.append(chat_kimi(prompt, system=system))
             task_labels.append("Kimi")
@@ -366,7 +366,7 @@ async def ai_select_top_reits(
     market_data: Optional[Dict[str, Dict]] = None,
     top_n: int = 5,
 ) -> Optional[List[Dict]]:
-    """使用AI三模型联合（MiniMax M2.5 + GLM-5 + Kimi K2.5）从候选池中选出Top N推荐
+    """使用AI三模型联合（MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6）从候选池中选出Top N推荐
 
     改进点（v1.1）：
       - 向AI提供丰富的量化市场数据（换手率、近期涨跌幅、价格区间等）
@@ -476,7 +476,7 @@ async def ai_select_top_reits(
             task_weights.append(MINIMAX_WEIGHT)
         if GLM_ENABLED:
             tasks.append(chat_glm(prompt, system=system, temperature=0.3))
-            task_labels.append("GLM-5")
+            task_labels.append("DeepSeek")
             task_weights.append(GLM_WEIGHT)
         if KIMI_ENABLED:
             tasks.append(chat_kimi(prompt, system=system))
@@ -727,7 +727,7 @@ async def run_full_screening(
         {
             "picks": [{code, name, sector, dividend_yield, reason, score}, ...],
             "filter_log": {total, after_dividend, after_income, after_turnover, after_sentiment, final},
-            "model_source": "MiniMax M2.5 + GLM-5 + Kimi K2.5",
+            "model_source": "MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6",
         }
     """
     codes = [r["code"] for r in all_reits]
@@ -800,7 +800,7 @@ async def run_full_screening(
     return {
         "picks": picks or [],
         "filter_log": filter_log,
-        "model_source": "MiniMax M2.5 + GLM-5 + Kimi K2.5",
+        "model_source": "MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6",
     }
 
 
@@ -812,7 +812,7 @@ async def evaluate_backtest(
     picks: List[Dict],
     returns: Dict[str, Dict],
 ) -> Optional[str]:
-    """使用AI三模型联合（MiniMax M2.5 + GLM-5 + Kimi K2.5）对回测结果进行评价
+    """使用AI三模型联合（MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6）对回测结果进行评价
     
     Args:
         picks: [{code, name, ...}, ...]
@@ -864,7 +864,7 @@ async def evaluate_backtest(
             task_weights.append(MINIMAX_WEIGHT)
         if GLM_ENABLED:
             tasks.append(chat_glm(prompt, system=system, temperature=0.3))
-            task_labels.append("GLM-5")
+            task_labels.append("DeepSeek")
             task_weights.append(GLM_WEIGHT)
         if KIMI_ENABLED:
             tasks.append(chat_kimi(prompt, system=system))

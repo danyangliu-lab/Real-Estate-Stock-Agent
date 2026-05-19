@@ -440,7 +440,7 @@ export default function REITsSection({ user }) {
                     本周关注 ({weeklyPicks.week_start} ~ {weeklyPicks.week_end})
                   </span>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                    模型: {weeklyPicks.model_source || 'MiniMax M2.5 + GLM-5 + Kimi K2.5'}
+                    模型: {weeklyPicks.model_source || 'MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6'}
                   </span>
                 </div>
 
