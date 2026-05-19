@@ -40,6 +40,10 @@ _token_cache = {
     "expires_at": 0,  # Unix timestamp
 }
 
+# 接口失败黑名单（同一进程内，某个 endpoint 连续 -4001 后短路，避免拖慢整批刷新）
+_endpoint_blacklist: dict = {}  # endpoint -> 失败次数
+_BLACKLIST_THRESHOLD = 5  # 连续失败 5 次后短路
+
 MAX_RETRIES = 3
 RETRY_DELAY = 2
 
@@ -130,6 +134,10 @@ def get_access_token() -> Optional[str]:
 
 def _post(endpoint: str, payload: dict, label: str = "") -> Optional[dict]:
     """带重试和token管理的POST请求"""
+    # 黑名单短路：某个接口本进程内连续 N 次 -4001（通常是无权限），就不再调用
+    if _endpoint_blacklist.get(endpoint, 0) >= _BLACKLIST_THRESHOLD:
+        return None
+
     token = get_access_token()
     if not token:
         logger.warning(f"iFinD {label}: 无可用token")
@@ -141,6 +149,9 @@ def _post(endpoint: str, payload: dict, label: str = "") -> Optional[dict]:
         "access_token": token,
     }
 
+    refreshed_once = False  # 同一次 _post 调用最多只刷新 token 一次，避免某些"实际无权限"接口
+                            # （如本账号不开通的公告查询）反复返回 -4001 把整批评分拖慢
+
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             resp = requests.post(url, headers=headers, json=payload, timeout=20)
@@ -148,13 +159,26 @@ def _post(endpoint: str, payload: dict, label: str = "") -> Optional[dict]:
             ec = data.get("errorcode", -1)
 
             if ec == 0:
+                # 成功调用：清除该接口黑名单计数
+                if endpoint in _endpoint_blacklist:
+                    _endpoint_blacklist.pop(endpoint, None)
                 return data
             elif ec == -4001:
-                # Token过期，刷新后重试
+                # Token过期或接口无权限，最多刷新一次 token 后重试
+                if refreshed_once:
+                    # 已经刷过 token 还是 -4001，说明大概率是接口未授权
+                    _endpoint_blacklist[endpoint] = _endpoint_blacklist.get(endpoint, 0) + 1
+                    if _endpoint_blacklist[endpoint] == _BLACKLIST_THRESHOLD:
+                        logger.warning(
+                            f"iFinD {label}: 持续返回-4001已达{_BLACKLIST_THRESHOLD}次，"
+                            f"判定为接口未授权，本进程内将不再调用 {endpoint}"
+                        )
+                    return None
                 logger.info(f"iFinD {label}: token过期，刷新中...")
                 _token_cache["access_token"] = None
                 _token_cache["expires_at"] = 0
                 token = refresh_access_token()
+                refreshed_once = True
                 if token:
                     headers["access_token"] = token
                     continue

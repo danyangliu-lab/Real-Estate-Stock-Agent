@@ -382,7 +382,7 @@ export default function REITsSection({ user }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <h3 style={{ margin: 0, fontSize: 16 }}>
-                📊 C-REITs 每周精选 · 5只关注
+                📊 C-REITs 每周精选 · 10只关注
               </h3>
               <span style={{
                 display: 'inline-block',

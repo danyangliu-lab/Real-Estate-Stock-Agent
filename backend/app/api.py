@@ -3024,6 +3024,46 @@ def _demo_weekly_picks(week_start, week_end) -> dict:
                 "reason": "高速公路资产流量恢复良好，分红稳定，类型多元化配置首选",
                 "score": 83,
             },
+            {
+                "code": "508056",
+                "name": "中金普洛斯REIT",
+                "sector": "仓储物流",
+                "dividend_yield": 5.94,
+                "reason": "普洛斯品牌+核心城市仓储物流资产，租约稳定，分红可预期性强",
+                "score": 82,
+            },
+            {
+                "code": "508088",
+                "name": "国泰君安东久新经济REIT",
+                "sector": "产业园",
+                "dividend_yield": 6.05,
+                "reason": "长三角新经济园区集合资产，租户多元化抗风险，估值具吸引力",
+                "score": 80,
+            },
+            {
+                "code": "180301",
+                "name": "红土创新盐田港REIT",
+                "sector": "仓储物流",
+                "dividend_yield": 5.76,
+                "reason": "盐田港现代物流仓储，外贸景气支撑租金，分红稳定",
+                "score": 78,
+            },
+            {
+                "code": "508021",
+                "name": "国金中国铁建REIT",
+                "sector": "交通",
+                "dividend_yield": 6.32,
+                "reason": "高速公路特许经营权，车流量恢复良好，分红率行业领先",
+                "score": 76,
+            },
+            {
+                "code": "508008",
+                "name": "国金铁建高速REIT",
+                "sector": "交通",
+                "dividend_yield": 6.48,
+                "reason": "重庆/贵州高速公路核心资产，车流恢复+分红双驱动",
+                "score": 75,
+            },
         ],
         "filter_log": {
             "total": 82,
@@ -3031,7 +3071,7 @@ def _demo_weekly_picks(week_start, week_end) -> dict:
             "after_income": 45,
             "after_turnover": 38,
             "after_sentiment": 32,
-            "final": 5,
+            "final": 10,
         },
         "model_source": "演示数据（MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6）",
         "created_at": None,
@@ -3086,7 +3126,7 @@ async def _generate_reit_weekly_picks(db: AsyncSession) -> Optional[dict]:
 
     try:
         # 运行完整筛选流水线
-        screening = await reits_engine.run_full_screening(reit_dicts, top_n=5)
+        screening = await reits_engine.run_full_screening(reit_dicts, top_n=10)
 
         picks = screening.get("picks", [])
         filter_log = screening.get("filter_log", {})
