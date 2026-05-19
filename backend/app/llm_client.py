@@ -1,6 +1,7 @@
 """
 腾讯云 TokenHub 多模型客户端（MiniMax M2.7 + DeepSeek V4 Pro + Kimi K2.6 三模型）
-- 三个模型均使用 LKEAP OpenAI 兼容接口（Bearer Token）
+- 三个模型均通过腾讯云 TokenHub OpenAI 兼容接口调用（Bearer Token）
+- 文档：https://cloud.tencent.com/document/product/1823/130078
 """
 
 import logging
@@ -12,18 +13,15 @@ from app.config import (
     MINIMAX_MODEL, MINIMAX_ENABLED,
     GLM_MODEL, GLM_ENABLED,
     KIMI_MODEL, KIMI_ENABLED,
-    LKEAP_API_KEY,
+    TOKENHUB_API_KEY, TOKENHUB_BASE_URL,
 )
 
 logger = logging.getLogger(__name__)
 
-# ── LKEAP OpenAI 兼容接口 ──
-LKEAP_OPENAI_BASE = "https://api.lkeap.cloud.tencent.com/v3"
 
+# ========== TokenHub OpenAI 兼容接口通用调用 ==========
 
-# ========== LKEAP OpenAI 兼容接口通用调用 ==========
-
-async def _call_lkeap_openai(
+async def _call_tokenhub_openai(
     model: str,
     prompt: str,
     system: str = "",
@@ -31,9 +29,9 @@ async def _call_lkeap_openai(
     enable_search: bool = False,
     label: str = "",
 ) -> Optional[str]:
-    """调用 LKEAP OpenAI 兼容接口（三模型共用）"""
-    if not LKEAP_API_KEY:
-        logger.warning(f"未配置 LKEAP_API_KEY，跳过 {label} 调用")
+    """调用腾讯云 TokenHub OpenAI 兼容接口（三模型共用）"""
+    if not TOKENHUB_API_KEY:
+        logger.warning(f"未配置 TOKENHUB_API_KEY，跳过 {label} 调用")
         return None
 
     messages = []
@@ -52,14 +50,14 @@ async def _call_lkeap_openai(
         body["enable_search"] = True
 
     headers = {
-        "Authorization": f"Bearer {LKEAP_API_KEY}",
+        "Authorization": f"Bearer {TOKENHUB_API_KEY}",
         "Content-Type": "application/json",
     }
 
     try:
         async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(
-                f"{LKEAP_OPENAI_BASE}/chat/completions",
+                f"{TOKENHUB_BASE_URL}/chat/completions",
                 headers=headers,
                 json=body,
             )
@@ -68,7 +66,11 @@ async def _call_lkeap_openai(
 
             if "choices" in data and len(data["choices"]) > 0:
                 msg = data["choices"][0].get("message", {})
-                content = msg.get("content", "")
+                content = msg.get("content", "") or ""
+                # TokenHub 上部分模型（含推理过程）会先返回 reasoning_content，
+                # 真正答案在 content 中；若 content 为空则回退到 reasoning_content。
+                if not content:
+                    content = msg.get("reasoning_content", "") or ""
                 return content if content else None
             elif "error" in data:
                 err = data["error"]
@@ -82,6 +84,10 @@ async def _call_lkeap_openai(
         return None
 
 
+# 兼容旧名（其他模块若 import 过 _call_lkeap_openai，仍可用）
+_call_lkeap_openai = _call_tokenhub_openai
+
+
 # ── MiniMax M2.7 ──
 
 async def chat_minimax(
@@ -90,10 +96,10 @@ async def chat_minimax(
     temperature: float = 0.3,
     enable_search: bool = False,
 ) -> Optional[str]:
-    """调用 MiniMax M2.7（LKEAP OpenAI 兼容接口）"""
+    """调用 MiniMax M2.7（腾讯云 TokenHub）"""
     if not MINIMAX_ENABLED:
         return None
-    return await _call_lkeap_openai(
+    return await _call_tokenhub_openai(
         model=MINIMAX_MODEL,
         prompt=prompt,
         system=system,
@@ -130,13 +136,13 @@ async def chat_glm(
     system: str = "",
     temperature: float = 0.3,
 ) -> Optional[str]:
-    """调用 DeepSeek V4 Pro（LKEAP OpenAI 兼容接口）
+    """调用 DeepSeek V4 Pro（腾讯云 TokenHub）
 
     注意：函数名保留为 chat_glm 以兼容已有调用方，实际模型已切换为 DeepSeek V4 Pro
     """
     if not GLM_ENABLED:
         return None
-    return await _call_lkeap_openai(
+    return await _call_tokenhub_openai(
         model=GLM_MODEL,
         prompt=prompt,
         system=system,
@@ -151,12 +157,12 @@ async def chat_kimi(
     prompt: str,
     system: str = "",
 ) -> Optional[str]:
-    """调用 Kimi K2.6（LKEAP OpenAI 兼容接口）
+    """调用 Kimi K2.6（腾讯云 TokenHub）
     注意：Kimi 系列暂不支持 temperature / top_p 参数
     """
     if not KIMI_ENABLED:
         return None
-    return await _call_lkeap_openai(
+    return await _call_tokenhub_openai(
         model=KIMI_MODEL,
         prompt=prompt,
         system=system,

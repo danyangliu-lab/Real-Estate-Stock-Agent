@@ -16,18 +16,26 @@ REFRESH_MINUTE = int(os.getenv("REFRESH_MINUTE", "0"))
 TENCENT_SECRET_ID = os.getenv("HUNYUAN_SECRET_ID", "")
 TENCENT_SECRET_KEY = os.getenv("HUNYUAN_SECRET_KEY", "")
 
-# LKEAP OpenAI 兼容接口 API Key（三模型共用）
-LKEAP_API_KEY = os.getenv("LKEAP_API_KEY", "")
+# 腾讯云 TokenHub OpenAI 兼容接口（三模型共用）
+# 文档：https://cloud.tencent.com/document/product/1823/130078
+TOKENHUB_API_KEY = os.getenv("TOKENHUB_API_KEY") or os.getenv("LKEAP_API_KEY", "")
+TOKENHUB_BASE_URL = os.getenv(
+    "TOKENHUB_BASE_URL",
+    "https://tokenhub.tencentmaas.com/v1",
+)
 
-# ── MiniMax M2.7 配置（LKEAP OpenAI 兼容接口）──
+# 兼容旧变量名
+LKEAP_API_KEY = TOKENHUB_API_KEY
+
+# ── MiniMax M2.7 配置（腾讯云 TokenHub）──
 MINIMAX_MODEL = os.getenv("MINIMAX_MODEL", "minimax-m2.7")
 MINIMAX_ENABLED = os.getenv("MINIMAX_ENABLED", "true").lower() == "true"
 
-# ── DeepSeek V4 Pro 配置（LKEAP OpenAI 兼容接口）──
+# ── DeepSeek V4 Pro 配置（腾讯云 TokenHub）──
 GLM_MODEL = os.getenv("GLM_MODEL", "deepseek-v4-pro")
 GLM_ENABLED = os.getenv("GLM_ENABLED", "true").lower() == "true"
 
-# ── Kimi K2.6 配置（LKEAP OpenAI 兼容接口）──
+# ── Kimi K2.6 配置（腾讯云 TokenHub）──
 KIMI_MODEL = os.getenv("KIMI_MODEL", "kimi-k2.6")
 KIMI_ENABLED = os.getenv("KIMI_ENABLED", "true").lower() == "true"
 
