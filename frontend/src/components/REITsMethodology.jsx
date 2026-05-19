@@ -152,7 +152,7 @@ function REITsScreeningMethodology() {
             <DimensionItem
               name="加权融合评分"
               weight="算法"
-              desc="模型评分×75% + 排名加分×25%，按MiniMax(40%)/GLM(30%)/Kimi(30%)加权"
+              desc="模型评分×75% + 排名加分×25%，按MiniMax(40%)/DeepSeek(30%)/Kimi(30%)加权"
             />
             <DimensionItem
               name="共识加分"
